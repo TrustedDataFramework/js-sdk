@@ -2,25 +2,57 @@ const BN = require('bn.js')
 const RLP = require('rlp')
 const sm3 = require('@salaku/sm-crypto').sm3
 const sm2 = require('@salaku/sm-crypto').sm2
+const http = require('http')
+
+function getNonce(host, port, pkOrAddress) {
+    return new Promise((resolve, reject) => {
+        http.get(
+            `http://${host}:${port}/rpc/account/${pkOrAddress}`, (res) => {
+                let data = ""
+
+                res.on("data", d => {
+                    data += d
+                })
+                res.on("end", () => {
+                    const d = JSON.parse(data)
+                    resolve(d.data.nonce)
+                })
+            })
+            .on('error', reject)
+    })
+}
+
+/**
+ * 生成合约地址
+ * @param pk 合约创建者的公钥
+ * @param nonce 事务的 nonce
+ * @returns {string} 合约的地址
+ */
+function getContractAddress(pk, nonce) {
+    nonce = nonce ? nonce : 0
+    let buf = RLP.encode([pk, nonce])
+    buf = Buffer.from(sm3(buf), 'hex')
+    return buf.slice(buf.length - 20, buf.length).toString('hex')
+}
 
 /**
  * 获得事务签名原文
  * @param tx 事务
  * @returns {Buffer}
  */
-function getSignaturePlain(tx){
-        const arr = [
-            tx['version'] ? asBigInteger(tx['version']) : 0,
-            tx['type'] ? asBigInteger(tx['type']): 0,
-            tx['createdAt'] ? asBigInteger(tx['createdAt']): 0,
-            tx['nonce'] ? asBigInteger(tx['nonce']): 0,
-            tx['from'] ? asBuffer(tx['from']): null,
-            tx['gasPrice'] ? asBigInteger(tx['gasPrice']): 0,
-            tx['amount'] ? asBigInteger(tx['amount']): 0,
-            tx['payload'] ? asBuffer(tx['payload']): null,
-            tx['to'] ? asBuffer(tx['to']): null,
-        ]
-        return RLP.encode(arr)
+function getSignaturePlain(tx) {
+    const arr = [
+        tx['version'] ? asBigInteger(tx['version']) : 0,
+        tx['type'] ? asBigInteger(tx['type']) : 0,
+        tx['createdAt'] ? asBigInteger(tx['createdAt']) : 0,
+        tx['nonce'] ? asBigInteger(tx['nonce']) : 0,
+        tx['from'] ? asBuffer(tx['from']) : null,
+        tx['gasPrice'] ? asBigInteger(tx['gasPrice']) : 0,
+        tx['amount'] ? asBigInteger(tx['amount']) : 0,
+        tx['payload'] ? asBuffer(tx['payload']) : null,
+        tx['to'] ? asBuffer(tx['to']) : null,
+    ]
+    return RLP.encode(arr)
 }
 
 /**
@@ -28,7 +60,7 @@ function getSignaturePlain(tx){
  * @param tx 事务
  * @returns {Buffer}
  */
-function getTransactionHash(tx){
+function getTransactionHash(tx) {
     const buf = getSignaturePlain(tx)
     return Buffer.from(sm3(buf), 'hex')
 }
@@ -38,10 +70,10 @@ function getTransactionHash(tx){
  * @param sk {string} 私钥
  * @returns {string}
  */
-function privateKey2PublicKey(sk){
-    if(sk instanceof Buffer)
+function privateKey2PublicKey(sk) {
+    if (sk instanceof Buffer)
         sk = sk.toString('hex')
-    return sm2.getPKFromSK(sk)
+    return sm2.compress(sm2.getPKFromSK(sk))
 }
 
 /**
@@ -49,7 +81,7 @@ function privateKey2PublicKey(sk){
  * @param pk 公钥
  * @returns {string}
  */
-function publicKey2Address(pk){
+function publicKey2Address(pk) {
     const buf = Buffer.from(sm3(pk), 'hex')
     return buf.slice(buf.length - 20, buf.length).toString('hex')
 }
@@ -59,13 +91,13 @@ function publicKey2Address(pk){
  * @param tx 事务
  * @param sk 私钥
  */
-function sign(tx, sk){
+function sign(tx, sk) {
     tx.signature =
         sm2.doSignature(
             getSignaturePlain(tx),
             sk,
-            {userId: 'userid@soie-chain.com', der: false, hash: true}
-            )
+            { userId: 'userid@soie-chain.com', der: false, hash: true }
+        )
 }
 
 /**
@@ -74,7 +106,7 @@ function sign(tx, sk){
  * @param args 调用的额外参数
  * @returns {Buffer}
  */
-function buildPayload(method, args){
+function buildPayload(method, args) {
     const m = Buffer.from(method, 'ascii')
     const l = Buffer.from([m.length])
     const a = args ? args : Buffer.from([])
@@ -87,22 +119,26 @@ module.exports = {
     getTransactionHash: getTransactionHash,
     sign: sign,
     buildPayload: buildPayload,
+    publicKey2Address: publicKey2Address,
+    privateKey2PublicKey: privateKey2PublicKey,
+    getContractAddress: getContractAddress,
+    getNonce: getNonce
 }
 
 
-function asBigInteger(x){
-    if(typeof x === 'string')
+function asBigInteger(x) {
+    if (typeof x === 'string')
         return new BN(x, 10)
     return x
 }
 
 
-function asBuffer(x){
-    if(typeof x === 'string')
+function asBuffer(x) {
+    if (typeof x === 'string')
         return Buffer.from(x, 'hex')
-    if(x instanceof ArrayBuffer)
+    if (x instanceof ArrayBuffer)
         return Buffer.from(new Uint8Array(x))
-    if(x instanceof Uint8Array)
+    if (x instanceof Uint8Array)
         return Buffer.from(x)
     return x
 }
