@@ -1,4 +1,4 @@
-# sm-crypto
+# js-sdk
 
 
 ## 安装
