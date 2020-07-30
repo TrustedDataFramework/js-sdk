@@ -34,6 +34,27 @@ function getTransactionHash(tx){
 }
 
 /**
+ * 私钥转公钥
+ * @param sk {string} 私钥
+ * @returns {string}
+ */
+function privateKey2PublicKey(sk){
+    if(sk instanceof Buffer)
+        sk = sk.toString('hex')
+    return sm2.getPKFromSK(sk)
+}
+
+/**
+ * 公钥转地址
+ * @param pk 公钥
+ * @returns {string}
+ */
+function publicKey2Address(pk){
+    const buf = Buffer.from(sm3(pk), 'hex')
+    return buf.slice(buf.length - 20, buf.length).toString('hex')
+}
+
+/**
  * 对事务作出签名
  * @param tx 事务
  * @param sk 私钥
@@ -65,7 +86,7 @@ module.exports = {
     getSignaturePlain: getSignaturePlain,
     getTransactionHash: getTransactionHash,
     sign: sign,
-    buildPayload: buildPayload
+    buildPayload: buildPayload,
 }
 
 
