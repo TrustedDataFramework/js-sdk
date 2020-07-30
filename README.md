@@ -91,3 +91,24 @@ const pk = '02a4d7ca616e70897b7874460da1aab58b56e54c200a08e52a04c69df26b138859' 
 tool.getNonce('localhost', 7010, pk)
     .then(nonce => console.log(`nonce = ${nonce}`))
 ```    
+
+### 发送事务（异步）
+
+```js
+const tool = require('@salaku/js-sdk')
+const tx = {
+    "version" : 1634693120,
+    "type" : 0,
+    "createdAt" : 1596091121,
+    "nonce" : 223814,
+    "from" : "",
+    "gasPrice" : 0,
+    "amount" : 20,
+    "payload" : "02b507fe1afd0cc7a525488292beadbe9f143784de44f8bc1c991636509fd50936",
+    "to" : "9cbf30db111483e4b84e77ca0e39378fd7605e1b",
+}
+
+tool.sendTransaction('localhost', 7010, tx)
+.then(console.log)
+.catch(console.error)
+```

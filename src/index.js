@@ -4,7 +4,57 @@ const sm3 = require('@salaku/sm-crypto').sm3
 const sm2 = require('@salaku/sm-crypto').sm2
 const http = require('http')
 
-function getNonce(host, port, pkOrAddress) {
+/**
+ * 发送事务
+ * @param host {string} 节点主机名
+ * @param port {string | number} 节点端口
+ * @param tx 事务
+ * @returns {Promise<Object>}
+ */
+function sendTransaction(host, port, tx){
+    const data = typeof tx === 'string' ? tx : JSON.stringify(tx)
+    return new Promise((resolve, reject) => {
+        const opt = {
+            host: host,
+            port: port,
+            path: '/rpc/transaction',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': data.length
+            }
+        }
+        const req = http.request(
+            opt, (res) => {
+                let data = ""
+
+                res.on("data", d => {
+                    data += d
+                })
+                res.on("end", () => {
+                    const d = JSON.parse(data)
+                    if(d.code === 200){
+                        resolve(d.data)
+                        return
+                    }
+                    reject(d.message)
+                })
+            })
+            .on('error', reject)
+
+        req.write(data)
+        req.end()
+    })
+}
+
+/**
+ *
+ * @param host {string} 节点主机名
+ * @param port {string | number} 节点端口
+ * @param pkOrAddress {string} 公钥或者地址
+ * @returns {Promise<Object>}
+ */
+function getAccount(host, port, pkOrAddress) {
     return new Promise((resolve, reject) => {
         http.get(
             `http://${host}:${port}/rpc/account/${pkOrAddress}`, (res) => {
@@ -15,7 +65,11 @@ function getNonce(host, port, pkOrAddress) {
                 })
                 res.on("end", () => {
                     const d = JSON.parse(data)
-                    resolve(d.data.nonce)
+                    if(d.code === 200){
+                        resolve(d.data)
+                        return
+                    }
+                    reject(d.message)
                 })
             })
             .on('error', reject)
@@ -23,9 +77,21 @@ function getNonce(host, port, pkOrAddress) {
 }
 
 /**
+ * 获取 nonce
+ * @param host {string} 节点主机名
+ * @param port {string | Number} 节点端口
+ * @param pkOrAddress {string} 公钥或者地址
+ * @returns {Promise<Number>}
+ */
+function getNonce(host, port, pkOrAddress) {
+    return getAccount(host, port, pkOrAddress)
+        .then(a => a.nonce)
+}
+
+/**
  * 生成合约地址
- * @param pk 合约创建者的公钥
- * @param nonce 事务的 nonce
+ * @param pk {string | Buffer} 合约创建者的公钥
+ * @param nonce {number} 事务的 nonce
  * @returns {string} 合约的地址
  */
 function getContractAddress(pk, nonce) {
@@ -122,7 +188,8 @@ module.exports = {
     publicKey2Address: publicKey2Address,
     privateKey2PublicKey: privateKey2PublicKey,
     getContractAddress: getContractAddress,
-    getNonce: getNonce
+    getNonce: getNonce,
+    sendTransaction: sendTransaction
 }
 
 
