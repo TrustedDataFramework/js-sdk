@@ -46,7 +46,6 @@ const tx = {
     "to" : "9cbf30db111483e4b84e77ca0e39378fd7605e1b",
 }
 
-// 填入事务和私钥
 console.log(tool.getTransactionHash(tx).toString('hex'))
 ```
 
