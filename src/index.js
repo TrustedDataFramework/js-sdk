@@ -249,7 +249,8 @@ module.exports = {
     sendTransaction: sendTransaction,
     getTransaction: getTransaction,
     getBlock: getBlock,
-    getHeader: getHeader
+    getHeader: getHeader,
+    viewContract: viewContract
 }
 
 
