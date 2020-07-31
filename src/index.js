@@ -5,6 +5,16 @@ const sm2 = require('@salaku/sm-crypto').sm2
 const http = require('http')
 const child_process = require('child_process');
 
+const constants = {
+    POA_VERSION: 1634693120,
+    POW_VERSION: 7368567,
+    POS_VERSION: 7368563,
+    COINBASE: 0,
+    TRANSFER: 1,
+    DEPLOY: 2,
+    CONTRACT_CALL: 3
+}
+
 /**
  * 编译合约
  * @param ascPath {string} 编译器路径，一般在 node_modules/.bin/asc 下面
@@ -15,7 +25,7 @@ function compileContract(ascPath, src) {
     return new Promise((resolve, reject) => {
         child_process.exec(
             ascPath + ' ' + conf.source + ' --optimize -b', // 执行的命令
-            {encoding: 'buffer'},
+            { encoding: 'buffer' },
             (err, stdout, stderr) => {
                 if (err) {
                     // err.code 是进程退出时的 exit code，非 0 都被认为错误
@@ -39,7 +49,7 @@ function rpcGet(url) {
                 })
                 res.on("end", () => {
                     const d = JSON.parse(data)
-                    if(d.code === 200){
+                    if (d.code === 200) {
                         resolve(d.data)
                         return
                     }
@@ -59,7 +69,7 @@ function rpcGet(url) {
  * @param args {Buffer} 额外的参数，字节数组
  * @returns {Promise<string>}
  */
-function viewContract(host, port, address, method, args){
+function viewContract(host, port, address, method, args) {
     const parameters = buildPayload(method, args)
     const url = `http://${host}:${port}/rpc/contract/${address}?parameters=${parameters.toString('hex')}`
     return rpcGet(url)
@@ -72,7 +82,7 @@ function viewContract(host, port, address, method, args){
  * @param tx 事务
  * @returns {Promise<Object>}
  */
-function sendTransaction(host, port, tx){
+function sendTransaction(host, port, tx) {
     const data = typeof tx === 'string' ? tx : JSON.stringify(tx)
     return new Promise((resolve, reject) => {
         const opt = {
@@ -94,7 +104,7 @@ function sendTransaction(host, port, tx){
                 })
                 res.on("end", () => {
                     const d = JSON.parse(data)
-                    if(d.code === 200){
+                    if (d.code === 200) {
                         resolve(d.data)
                         return
                     }
@@ -115,7 +125,7 @@ function sendTransaction(host, port, tx){
  * @param hashOrHeight {string | number} 区块哈希值或者区块高度
  * @returns {Promise<Object>}
  */
-function getHeader(host, port, hashOrHeight){
+function getHeader(host, port, hashOrHeight) {
     const url = `http://${host}:${port}/rpc/header/${hashOrHeight}`
     return rpcGet(url)
 }
@@ -127,7 +137,7 @@ function getHeader(host, port, hashOrHeight){
  * @param hashOrHeight {string | number} 区块哈希值或者区块高度
  * @returns {Promise<Object>}
  */
-function getBlock(host, port, hashOrHeight){
+function getBlock(host, port, hashOrHeight) {
     const url = `http://${host}:${port}/rpc/block/${hashOrHeight}`
     return rpcGet(url)
 }
@@ -139,7 +149,7 @@ function getBlock(host, port, hashOrHeight){
  * @param hash 事务哈希值
  * @returns {Promise<Object>}
  */
-function getTransaction(host, port, hash){
+function getTransaction(host, port, hash) {
     const url = `http://${host}:${port}/rpc/transaction/${hash}`
     return rpcGet(url)
 }
@@ -175,7 +185,7 @@ function getNonce(host, port, pkOrAddress) {
  * @returns {string} 合约的地址
  */
 function getContractAddress(pk, nonce) {
-    if(typeof pk === 'string')
+    if (typeof pk === 'string')
         pk = Buffer.from(pk, 'hex')
     nonce = nonce ? nonce : 0
     let buf = RLP.encode([pk, nonce])
@@ -276,17 +286,26 @@ module.exports = {
     getBlock: getBlock,
     getHeader: getHeader,
     viewContract: viewContract,
-    compileContract: compileContract
+    compileContract: compileContract,
+    constants: constants
 }
 
-
+/**
+ * string 转 BN
+ * @param {string | number} x 
+ * @returns {BN}
+ */
 function asBigInteger(x) {
     if (typeof x === 'string')
         return new BN(x, 10)
     return x
 }
 
-
+/**
+ * hex string 转 buffer
+ * @param {string | ArrayBuffer | Uint8Array } x 
+ * @returns {Buffer}
+ */
 function asBuffer(x) {
     if (typeof x === 'string')
         return Buffer.from(x, 'hex')

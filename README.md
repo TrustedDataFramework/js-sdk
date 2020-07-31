@@ -7,6 +7,21 @@
 npm install --save @salaku/js-sdk
 ```
 
+### 常量
+
+```js
+const tool = require('@salaku/js-sdk')
+console.log(constants)
+// tool.constants = {
+//     POA_VERSION: 1634693120,
+//     POW_VERSION: 7368567,
+//     POS_VERSION: 7368563,
+//     COINBASE: 0,
+//     TRANSFER: 1,
+//     DEPLOY: 2,
+//     CONTRACT_CALL: 3
+// }
+```
 
 ### 事务签名
 
@@ -81,6 +96,15 @@ const tool = require('@salaku/js-sdk')
 const pk = '02a4d7ca616e70897b7874460da1aab58b56e54c200a08e52a04c69df26b138859' // 公钥
 const nonce = 100 // nonce
 console.log(tool.getContractAddress(pk, nonce))
+```
+
+### 查看账户
+
+```js
+const tool = require('@salaku/js-sdk')
+const pk = '02a4d7ca616e70897b7874460da1aab58b56e54c200a08e52a04c69df26b138859' // 公钥或者地址
+tool.getAccont('localhost', 7010, pk)
+    .then(console.log)
 ```
 
 ### 获取 nonce （异步）
