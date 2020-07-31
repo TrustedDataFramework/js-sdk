@@ -112,3 +112,34 @@ tool.sendTransaction('localhost', 7010, tx)
 .then(console.log)
 .catch(console.error)
 ```
+
+
+### 查看区块（异步）
+
+```js
+const tool = require('@salaku/js-sdk')
+tool.getBlock('localhost', 7010, 1) // 可以填区块哈希值或者区块高度
+.then(console.log)
+.catch(console.error)
+```
+
+### 查看区块头（异步）
+
+```js
+const tool = require('@salaku/js-sdk')
+tool.getHeader('localhost', 7010, 1) // 可以填区块哈希值或者区块高度
+.then(console.log)
+.catch(console.error)
+```
+
+### 查看事务（异步）
+
+```js
+const tool = require('@salaku/js-sdk')
+tool.getTransaction('localhost', 7010, 1) // 可以填区块哈希值或者区块高度
+.then(console.log)
+.catch(console.error)
+// 事务的 confrims 字段 -1 表示在内存池中
+// 0 或者以上表示被确认, confirms 表示确认数量
+// 如出现异常，表示事务不存在
+```
