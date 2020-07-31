@@ -136,7 +136,7 @@ tool.getHeader('localhost', 7010, 1) // 可以填区块哈希值或者区块高�
 
 ```js
 const tool = require('@salaku/js-sdk')
-tool.getTransaction('localhost', 7010, 1) // 可以填区块哈希值或者区块高度
+tool.getTransaction('localhost', 7010, '****') // 填写事务哈希
 .then(console.log)
 .catch(console.error)
 // 事务的 confrims 字段 -1 表示在内存池中
@@ -148,7 +148,7 @@ tool.getTransaction('localhost', 7010, 1) // 可以填区块哈希值或者区�
 
 ```js
 const tool = require('@salaku/js-sdk')
-tool.viewContract('localhost', 7010, '****合约地址****', 'method', Buffer.from('ff', 'hex')) // 可以填区块哈希值或者区块高度
+tool.viewContract('localhost', 7010, '****合约地址****', 'method', Buffer.from('ff', 'hex')) // 额外参数
 .then(console.log)
 .catch(console.error)
 // 事务的 confrims 字段 -1 表示在内存池中

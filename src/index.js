@@ -38,7 +38,7 @@ function rpcGet(url) {
  */
 function viewContract(host, port, address, method, args){
     const parameters = buildPayload(method, args)
-    const url = `http://${host}:${port}/rpc/contract/${address}?parameters=${parameters}`
+    const url = `http://${host}:${port}/rpc/contract/${address}?parameters=${parameters.toString('hex')}`
     return rpcGet(url)
 }
 
@@ -152,6 +152,8 @@ function getNonce(host, port, pkOrAddress) {
  * @returns {string} 合约的地址
  */
 function getContractAddress(pk, nonce) {
+    if(typeof pk === 'string')
+        pk = Buffer.from(pk, 'hex')
     nonce = nonce ? nonce : 0
     let buf = RLP.encode([pk, nonce])
     buf = Buffer.from(sm3(buf), 'hex')
