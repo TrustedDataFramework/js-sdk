@@ -3,7 +3,30 @@ const RLP = require('rlp')
 const sm3 = require('@salaku/sm-crypto').sm3
 const sm2 = require('@salaku/sm-crypto').sm2
 const http = require('http')
+const child_process = require('child_process');
 
+/**
+ * 编译合约
+ * @param ascPath {string} 编译器路径，一般在 node_modules/.bin/asc 下面
+ * @param src {string} 源文件路径
+ * @returns {Promise<Buffer>}
+ */
+function compile(ascPath, src) {
+    return new Promise((resolve, reject) => {
+        child_process.exec(
+            ascPath + ' ' + conf.source + ' --optimize -b', // 执行的命令
+            {encoding: 'buffer'},
+            (err, stdout, stderr) => {
+                if (err) {
+                    // err.code 是进程退出时的 exit code，非 0 都被认为错误
+                    // err.signal 是结束进程时发送给它的信号值
+                    reject(stderr.toString('ascii'))
+                }
+                resolve(stdout)
+            }
+        );
+    })
+}
 
 function rpcGet(url) {
     return new Promise((resolve, reject) => {

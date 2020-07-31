@@ -155,3 +155,13 @@ tool.viewContract('localhost', 7010, '****合约地址****', 'method', Buffer.fr
 // 0 或者以上表示被确认, confirms 表示确认数量
 // 如出现异常，表示事务不存在
 ```
+
+### 编译合约（异步）
+
+```js
+const tool = require('@salaku/js-sdk')
+const ascPath = 'node_modules/.bin/asc'
+const src = 'index.ts'
+tool.compile(ascPath, src)
+    .then(buf => console.log('buf length ' + buf.length))
+```
