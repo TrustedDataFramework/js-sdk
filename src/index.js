@@ -11,7 +11,7 @@ const child_process = require('child_process');
  * @param src {string} 源文件路径
  * @returns {Promise<Buffer>}
  */
-function compile(ascPath, src) {
+function compileContract(ascPath, src) {
     return new Promise((resolve, reject) => {
         child_process.exec(
             ascPath + ' ' + conf.source + ' --optimize -b', // 执行的命令
@@ -275,7 +275,8 @@ module.exports = {
     getTransaction: getTransaction,
     getBlock: getBlock,
     getHeader: getHeader,
-    viewContract: viewContract
+    viewContract: viewContract,
+    compileContract: compileContract
 }
 
 
