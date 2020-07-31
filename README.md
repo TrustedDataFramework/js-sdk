@@ -162,6 +162,6 @@ tool.viewContract('localhost', 7010, '****合约地址****', 'method', Buffer.fr
 const tool = require('@salaku/js-sdk')
 const ascPath = 'node_modules/.bin/asc'
 const src = 'index.ts'
-tool.compile(ascPath, src)
+tool.compileContract(ascPath, src)
     .then(buf => console.log('buf length ' + buf.length))
 ```
