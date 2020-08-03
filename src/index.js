@@ -80,7 +80,7 @@ class RPC {
     /**
      * 查看申请加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<[]>}
+     * @returns {Promise<Object>}
      */
     getAuthPending(contractAddress) {
         return rpcPost(this.host, this.port, `/rpc/contract/${contractAddress}`, {
@@ -268,7 +268,7 @@ function rpcGet(url) {
 }
 
 function rpcPost(host, port, path, data) {
-    data = typeof data === 'string' ? tx : JSON.stringify(data)
+    data = typeof data === 'string' ? data : JSON.stringify(data)
     return new Promise((resolve, reject) => {
         const opt = {
             host: host,
