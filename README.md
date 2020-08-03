@@ -25,7 +25,7 @@ constants ==
   CONTRACT_CALL: 3,
   PEER_AUTHENTICATION_ADDR: '0000000000000000000000000000000000000003',
   POA_AUTHENTICATION_ADDR: '0000000000000000000000000000000000000004',
-  POS_AUTHENTICATION_ADDR: '0000000000000000000000000000000000000005'
+  POS_CONTRACT_ADDR: '0000000000000000000000000000000000000005'
 }
 
 ```
@@ -255,6 +255,22 @@ tx.nonce = 1
 builder.sign(tx)
 ```
 
+### 构造投票事务
+
+```js
+const tx = builder.buildVote(1000, '***address***')
+tx.nonce = 1
+builder.sign(tx)
+```
+
+### 构造取消投票事务
+
+```js
+const tx = builder.buildCancelVote('***transaction hash***')
+tx.nonce = 1
+builder.sign(tx)
+```
+
 ## RPC 工具类
 
 ```js
@@ -350,4 +366,20 @@ rpc.getAuthPending(constants.PEER_AUTHENTICATION_ADDR)
 rpc.getAuthNodes(constants.PEER_AUTHENTICATION_ADDR)
 .then(console.log)
 .catch(console.error)
+```
+
+### 查看投票列表
+
+```js
+rpc.getPoSNodeInfos()
+    .then(console.log)
+    .catch(console.error)
+```
+
+### 查看所有投出的票
+
+```js
+rpc.getPoSVoteInfos()
+    .then(console.log)
+    .catch(console.error)
 ```

@@ -98,6 +98,26 @@ class RPC {
             method: 'nodes'
         })
     }
+
+    /**
+     * 查看投票数量排名列表
+     * @returns {Promise<Object>}
+     */
+    getPoSNodeInfos(){
+        return rpcPost(this.host, this.port, `/rpc/contract/${constants.POS_CONTRACT_ADDR}`, {
+            method: 'nodeInfos'
+        })
+    }
+
+    /**
+     * 查看所有投的票
+     * @returns {Promise<Object>}
+     */
+    getPoSVoteInfos(){
+        return rpcPost(this.host, this.port, `/rpc/contract/${constants.POS_CONTRACT_ADDR}`, {
+            method: 'voteInfos'
+        })
+    }
 }
 
 class TransactionBuilder {
@@ -201,6 +221,30 @@ class TransactionBuilder {
     }
 
     /**
+     * 构造投票事务（未签名）
+     * @param amount {number} 投票数量
+     * @param to {string} 被投票者的地址
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildVote(amount, to){
+        const payload = '00' + to;
+        return this.buildCommon(constants.CONTRACT_CALL, amount, payload, constants.POS_CONTRACT_ADDR)
+    }
+
+    /**
+     * 构造撤销投票事务（未签名）
+     * @param hash {string | Buffer} 签名事务的哈希值
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildCancelVote(hash){
+        if(typeof hash !== 'string'){
+            hash = hash.toString('hex')
+        }
+        const payload = '01' + hash
+        return this.buildCommon(constants.CONTRACT_CALL, 0, payload, constants.POS_CONTRACT_ADDR)
+    }
+
+    /**
      * 对事务作出签名
      * @param tx 事务
      */
@@ -219,7 +263,7 @@ const constants = {
     CONTRACT_CALL: 3,
     PEER_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000003",
     POA_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000004",
-    POS_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000005"
+    POS_CONTRACT_ADDR: "0000000000000000000000000000000000000005"
 }
 
 /**
