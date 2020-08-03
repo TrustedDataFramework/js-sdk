@@ -5,6 +5,210 @@ const sm2 = require('@salaku/sm-crypto').sm2
 const http = require('http')
 const child_process = require('child_process');
 
+class RPC {
+    constructor(host, port) {
+        this.host = host
+        this.port = port
+    }
+
+    /**
+     * 查看合约方法
+     * @param address {string} 合约的地址
+     * @param method {string} 查看的方法
+     * @param parameters {Buffer} 额外的参数，字节数组
+     * @returns {Promise<string>}
+     */
+    viewContract(address, method, parameters) {
+        return viewContract(this.host, this.port, address, method, parameters)
+    }
+
+    /**
+     * 发送事务
+     * @param tx 事务
+     * @returns {Promise<Object>}
+     */
+    sendTransaction(tx) {
+        return sendTransaction(this.host, this.port, tx)
+    }
+
+    /**
+     * 查看区块头
+     * @param hashOrHeight {string | number} 区块哈希值或者区块高度
+     * @returns {Promise<Object>}
+     */
+    getHeader(hashOrHeight) {
+        return getHeader(this.host, this.port, hashOrHeight)
+    }
+
+    /**
+     * 查看区块
+     * @param hashOrHeight {string | number} 区块哈希值或者区块高度
+     * @returns {Promise<Object>}
+     */
+    getBlock(hashOrHeight) {
+        return getBlock(this.host, this.port, hashOrHeight)
+    }
+
+    /**
+     * 查看事务
+     * @param hash 事务哈希值
+     * @returns {Promise<Object>}
+     */
+    getTransaction(hash) {
+        return getTransaction(this.host, this.port, hash)
+    }
+
+    /**
+     * 查看账户
+     * @param pkOrAddress {string} 公钥或者地址
+     * @returns {Promise<Object>}
+     */
+    getAccount(pkOrAddress) {
+        return getAccount(this.host, this.port, pkOrAddress)
+    }
+
+    /**
+     * 获取 nonce
+     * @param pkOrAddress {string} 公钥或者地址
+     * @returns {Promise<Number>}
+     */
+    getNonce(pkOrAddress) {
+        return this.getAccount(pkOrAddress)
+            .then(a => a.nonce)
+    }
+
+    /**
+     * 查看申请加入的地址
+     * @param contractAddress 合约地址
+     * @returns {Promise<[]>}
+     */
+    getAuthPending(contractAddress) {
+        return rpcPost(this.host, this.port, `/rpc/contract/${contractAddress}`, {
+            method: 'pending'
+        })
+    }
+
+    /**
+     * 查看已经加入的地址
+     * @param contractAddress 合约地址
+     * @returns {Promise<[]>}
+     */
+    getAuthNodes(contractAddress) {
+        return rpcPost(this.host, this.port, `/rpc/contract/${contractAddress}`, {
+            method: 'nodes'
+        })
+    }
+}
+
+class TransactionBuilder {
+    /**
+     *
+     * @param version {number | string} 事务版本号
+     * @param sk {string | Buffer} 私钥
+     * @param gasPrice {number} 油价，油价 * 油 = 手续费
+     */
+    constructor(version, sk, gasPrice) {
+        this.version = version
+        this.sk = sk
+        this.gasPrice = gasPrice || 0
+    }
+
+    /**
+     * 创建转账事务（未签名）
+     * @param amount 转账金额
+     * @param to 转账接收者
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildTransfer(amount, to) {
+        return this.buildCommon(constants.TRANSFER, amount, '', to)
+    }
+
+    /**
+     * 构造部署合约的事务 （未签名）
+     * @param payload {string | Buffer} 编译后的合约字节码
+     * @param amount {number}
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildDeploy(payload, amount) {
+        if (typeof payload !== 'string')
+            payload = payload.toString('hex')
+        return this.buildCommon(constants.DEPLOY, amount, payload, '')
+    }
+
+    /**
+     * 构造合约调用事务
+     * @param addr {string} 合约地址
+     * @param payload {string | Buffer} 合约 payload 内容，用 buildPayload 构造
+     * @param amount {number} 金额
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildContractCall(addr, payload, amount) {
+        if (typeof payload !== 'string')
+            payload = payload.toString('hex')
+        return this.buildCommon(constants.CONTRACT_CALL, amount, payload, addr)
+    }
+
+    /**
+     * 创建事务（未签名）
+     * @param type {number} 事务类型
+     * @param amount {number} 金额
+     * @param payload {string}
+     * @param to {string} 接收者的地址
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildCommon(type, amount, payload, to) {
+        return {
+            version: this.version,
+            type: type,
+            createdAt: Math.floor((new Date()).valueOf() / 1000),
+            from: privateKey2PublicKey(this.sk),
+            gasPrice: this.gasPrice,
+            amount: amount || 0,
+            payload: payload || '',
+            to: to
+        }
+    }
+
+    /**
+     * 构造加入请求事务（未签名）
+     * @param address {string} 合约地址
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildAuthJoin(address) {
+        const payload = '00'
+        return this.buildCommon(constants.CONTRACT_CALL, 0, payload, address)
+    }
+
+    /**
+     * 构造同意加入的请求（未签名）
+     * @param contractAddress {string} 合约地址
+     * @param approvedAddress {string} 同意加入的地址
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildAuthApprove(contractAddress, approvedAddress) {
+        const payload = '01' + approvedAddress
+        return this.buildCommon(constants.CONTRACT_CALL, 0, payload, contractAddress)
+    }
+
+    /**
+     * 构造退出事务（未签名）
+     * @param contractAddress {string} 合约地址
+     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     */
+    buildAuthExit(contractAddress) {
+        const payload = '02' + privateKey2PublicKey(this.sk)
+        return this.buildCommon(constants.CONTRACT_CALL, 0, payload, contractAddress)
+    }
+
+    /**
+     * 对事务作出签名
+     * @param tx 事务
+     */
+    sign(tx) {
+        sign(tx, this.sk)
+    }
+}
+
 const constants = {
     POA_VERSION: 1634693120,
     POW_VERSION: 7368567,
@@ -12,7 +216,10 @@ const constants = {
     COINBASE: 0,
     TRANSFER: 1,
     DEPLOY: 2,
-    CONTRACT_CALL: 3
+    CONTRACT_CALL: 3,
+    PEER_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000003",
+    POA_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000004",
+    POS_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000005"
 }
 
 /**
@@ -60,35 +267,13 @@ function rpcGet(url) {
     })
 }
 
-/**
- *
- * @param host {string} 节点主机名
- * @param port {string | number} 节点端口
- * @param address {string} 合约的地址
- * @param method {string} 查看的方法
- * @param args {Buffer} 额外的参数，字节数组
- * @returns {Promise<string>}
- */
-function viewContract(host, port, address, method, args) {
-    const parameters = buildPayload(method, args)
-    const url = `http://${host}:${port}/rpc/contract/${address}?parameters=${parameters.toString('hex')}`
-    return rpcGet(url)
-}
-
-/**
- * 发送事务
- * @param host {string} 节点主机名
- * @param port {string | number} 节点端口
- * @param tx 事务
- * @returns {Promise<Object>}
- */
-function sendTransaction(host, port, tx) {
-    const data = typeof tx === 'string' ? tx : JSON.stringify(tx)
+function rpcPost(host, port, path, data) {
+    data = typeof data === 'string' ? tx : JSON.stringify(data)
     return new Promise((resolve, reject) => {
         const opt = {
             host: host,
             port: port,
-            path: '/rpc/transaction',
+            path: path,
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -116,6 +301,33 @@ function sendTransaction(host, port, tx) {
         req.write(data)
         req.end()
     })
+}
+
+/**
+ * 查看合约方法
+ * @param host {string} 节点主机名
+ * @param port {string | number} 节点端口
+ * @param address {string} 合约的地址
+ * @param method {string} 查看的方法
+ * @param parameters {Buffer} 额外的参数，字节数组
+ * @returns {Promise<string>}
+ */
+function viewContract(host, port, address, method, parameters) {
+    const args = buildPayload(method, parameters)
+    const url = `http://${host}:${port}/rpc/contract/${address}?args=${args.toString('hex')}`
+    return rpcGet(url)
+}
+
+/**
+ * 发送事务
+ * @param host {string} 节点主机名
+ * @param port {string | number} 节点端口
+ * @param tx 事务
+ * @returns {Promise<Object>}
+ */
+function sendTransaction(host, port, tx) {
+    const data = typeof tx === 'string' ? tx : JSON.stringify(tx)
+    return rpcPost(host, port, '/rpc/transaction', data)
 }
 
 /**
@@ -261,13 +473,15 @@ function sign(tx, sk) {
 /**
  * 构造合约调用的 payload，或者查看合约的
  * @param method {string} 调用的方法名
- * @param args 调用的额外参数
+ * @param parameters {string | Buffer} 调用的额外参数
  * @returns {Buffer}
  */
-function buildPayload(method, args) {
+function buildPayload(method, parameters) {
     const m = Buffer.from(method, 'ascii')
     const l = Buffer.from([m.length])
-    const a = args ? args : Buffer.from([])
+    if (typeof parameters === 'string')
+        parameters = Buffer.from(parameters, 'hex')
+    const a = parameters ? parameters : Buffer.from([])
     return Buffer.concat([l, m, a])
 }
 
@@ -287,12 +501,14 @@ module.exports = {
     getHeader: getHeader,
     viewContract: viewContract,
     compileContract: compileContract,
-    constants: constants
+    constants: constants,
+    TransactionBuilder: TransactionBuilder,
+    RPC: RPC
 }
 
 /**
  * string 转 BN
- * @param {string | number} x 
+ * @param {string | number} x
  * @returns {BN}
  */
 function asBigInteger(x) {
@@ -303,7 +519,7 @@ function asBigInteger(x) {
 
 /**
  * hex string 转 buffer
- * @param {string | ArrayBuffer | Uint8Array } x 
+ * @param {string | ArrayBuffer | Uint8Array } x
  * @returns {Buffer}
  */
 function asBuffer(x) {

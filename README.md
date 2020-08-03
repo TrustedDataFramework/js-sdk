@@ -7,6 +7,8 @@
 npm install --save @salaku/js-sdk
 ```
 
+## 基本使用
+
 ### 常量
 
 ```js
@@ -189,3 +191,39 @@ const src = 'index.ts'
 tool.compileContract(ascPath, src)
     .then(buf => console.log('buf length ' + buf.length))
 ```
+
+
+## 事务构造器
+
+```js
+const sk = 'f00df601a78147ffe0b84de1dffbebed2a6ea965becd5d0bd7faf54f1f29c6b5' // 私钥
+const builder = new tool.TransactionBuilder(constants.POA_VERSION, sk, 0)
+```
+
+### 构造转账事务并且签名
+
+```js
+const tx = builder.buildTransfer(1000, '****address****')
+tx.nonce = 1
+builder.sign(tx)
+```
+
+
+### 构造合约部署事务并且签名
+
+```js
+const buf = await tool.compileContract('index.ts')
+const tx = builder.buildDeploy(buf, 1000) // 
+tx.nonce = 1
+builder.sign(tx)
+```
+
+### 构造合约调用事务并且签名
+
+```js
+const tx = builder.buildContractCall('****address****', buildPaylod('method', '00'), 0)
+tx.nonce = 1
+builder.sign(tx)
+```
+
+
