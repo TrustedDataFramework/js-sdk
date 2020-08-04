@@ -376,10 +376,18 @@ rpc.getPoSNodeInfos()
     .catch(console.error)
 ```
 
-### 查看所有投出的票
+### 根据事务哈希查看投票
 
 ```js
-rpc.getPoSVoteInfos()
+rpc.getPoSVoteInfo('**txhash**')
     .then(console.log)
     .catch(console.error)
+```
+
+### 撤回投票
+
+撤回投票事务的 from 必须是投票事务的 from
+
+```js
+const tx = builder.buildCancelVote('c2458cad4c838b81b49500d9268b352b03cd1b78423c113f1b11f41c4ce13657')
 ```
