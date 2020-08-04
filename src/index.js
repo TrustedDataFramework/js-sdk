@@ -110,12 +110,14 @@ class RPC {
     }
 
     /**
-     * 查看所有投的票
-     * @returns {Promise<Object>}
+     * 查看投票
+     * @param txHash 投票的事务哈希值
+     * @returns {Promise<unknown>}
      */
-    getPoSVoteInfos(){
+    getPoSVoteInfo(txHash){
         return rpcPost(this.host, this.port, `/rpc/contract/${constants.POS_CONTRACT_ADDR}`, {
-            method: 'voteInfos'
+            method: 'voteInfo',
+            txHash: txHash
         })
     }
 }
@@ -125,7 +127,7 @@ class TransactionBuilder {
      *
      * @param version {number | string} 事务版本号
      * @param sk {string | Buffer} 私钥
-     * @param gasPrice {number} 油价，油价 * 油 = 手续费
+     * @param gasPrice {number | undefined} 油价，油价 * 油 = 手续费
      */
     constructor(version, sk, gasPrice) {
         this.version = version
@@ -492,10 +494,12 @@ function privateKey2PublicKey(sk) {
 
 /**
  * 公钥转地址
- * @param pk 公钥
+ * @param pk {string | Buffer} 公钥
  * @returns {string}
  */
 function publicKey2Address(pk) {
+    if(typeof pk === 'string')
+        pk = Buffer.from(pk, 'hex')
     const buf = Buffer.from(sm3(pk), 'hex')
     return buf.slice(buf.length - 20, buf.length).toString('hex')
 }
