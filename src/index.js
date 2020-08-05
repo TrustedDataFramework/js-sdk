@@ -24,7 +24,7 @@ class RPC {
 
     /**
      * 发送事务
-     * @param tx 事务
+     * @param tx {Object | Array}事务
      * @returns {Promise<Object>}
      */
     sendTransaction(tx) {
@@ -277,7 +277,7 @@ const constants = {
 function compileContract(ascPath, src) {
     return new Promise((resolve, reject) => {
         child_process.exec(
-            ascPath + ' ' + conf.source + ' --optimize -b', // 执行的命令
+            ascPath + ' ' + src + ' --optimize -b', // 执行的命令
             { encoding: 'buffer' },
             (err, stdout, stderr) => {
                 if (err) {
@@ -533,6 +533,23 @@ function buildPayload(method, parameters) {
     return Buffer.concat([l, m, a])
 }
 
+/**
+ * 生成私钥
+ * @returns {string} 私钥
+ */
+function generatePrivateKey(){
+    return sm2.generateKeyPairHex()[0]
+}
+
+/**
+ * 生成证书
+ * @param pk 公钥
+ * @param sk 你的私钥
+ * @returns {Object}
+ */
+function generateSecretStore(pk, sk){
+    return sm2.doEncrypt()
+}
 
 module.exports = {
     getSignaturePlain: getSignaturePlain,
@@ -551,7 +568,8 @@ module.exports = {
     compileContract: compileContract,
     constants: constants,
     TransactionBuilder: TransactionBuilder,
-    RPC: RPC
+    RPC: RPC,
+    generatePrivateKey: generatePrivateKey
 }
 
 /**

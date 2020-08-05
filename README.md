@@ -88,6 +88,14 @@ const pk = '02a4d7ca616e70897b7874460da1aab58b56e54c200a08e52a04c69df26b138859' 
 console.log(tool.publicKey2Address(pk))
 ```
 
+### 生成随机的私钥
+
+```js
+const tool = require('@salaku/js-sdk')
+const sk = tool.generatePrivateKey() // 私钥
+console.log(sk)
+```
+
 ### 私钥转公钥
 
 ```js
