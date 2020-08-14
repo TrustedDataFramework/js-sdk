@@ -419,6 +419,7 @@ const sk = tool.readKeyStore(
 ### 创建poa认证服务并启动
 
 ```js
+// ['03e3198bd3c12ab68566fcf14903dee3456cd1e1d8a0121ca04aade9b752750216'] 是公钥白名单，只有持有此公钥对应的私钥的节点才能访问这个服务
 const server = tool.createAuthServer(sk, ['03e3198bd3c12ab68566fcf14903dee3456cd1e1d8a0121ca04aade9b752750216'])
 
 server.listen(3000, function () {
