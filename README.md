@@ -415,3 +415,13 @@ const sk = tool.readKeyStore(
     "123456"
 )
 ```
+
+### 创建poa认证服务并启动
+
+```js
+const server = tool.createAuthServer(sk, ['03e3198bd3c12ab68566fcf14903dee3456cd1e1d8a0121ca04aade9b752750216'])
+
+server.listen(3000, function () {
+    console.log('服务器启动成功了，可以通过 http://127.0.0.1:3000/ 来进行访问')
+})
+```

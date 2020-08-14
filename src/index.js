@@ -573,7 +573,8 @@ module.exports = {
     RPC: RPC,
     generatePrivateKey: generatePrivateKey,
     readKeyStore:readKeyStore,
-    createKeyStore: createKeyStore
+    createKeyStore: createKeyStore,
+    createAuthServer: createAuthServer
 }
 
 /**
@@ -681,4 +682,43 @@ function uuidv4() {
         var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
+}
+
+/**
+ *
+ * @param whiteList {Array<string> | undefined } 公钥白名单
+ * @param privateKey {string | Buffer} 私钥
+ * @returns {Object}
+ */
+function createAuthServer(privateKey, whiteList){
+    const URL  = require('url');
+    const http = require('http')
+    const server = http.createServer()
+
+    server.on('request', function (request, response) {
+
+        let otherPublicKey = URL.parse(request.url, true).query['publicKey']
+        if(whiteList && whiteList.length){
+            const exists = whiteList.map(x => x === otherPublicKey)
+                .reduce((x, y) => x || y, false)
+            if(!exists)
+                throw new Error(`invalid public key, not in white list ${otherPublicKey}`)
+        }
+
+        // 对公钥进行解压缩
+        if (otherPublicKey.substr(0, 2) !== '04') {
+            otherPublicKey = sm2.deCompress(otherPublicKey)
+        }
+
+        // 生成密文
+        const ret = {
+            publicKey: privateKey2PublicKey(privateKey),
+            cipherText: sm2.doEncrypt(Buffer.from(privateKey, 'hex'), otherPublicKey, sm2.C1C2C3)
+        }
+
+        response.write(JSON.stringify(ret))
+        response.end()
+
+    })
+    return server
 }
