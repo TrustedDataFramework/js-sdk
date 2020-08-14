@@ -399,3 +399,19 @@ rpc.getPoSVoteInfo('**txhash**')
 ```js
 const tx = builder.buildCancelVote('c2458cad4c838b81b49500d9268b352b03cd1b78423c113f1b11f41c4ce13657')
 ```
+
+### 生成 keystore
+
+```js
+const password = 'abc123'
+const ks = tool.createKeyStore(password)
+console.log(ks)
+```
+
+### 读取 keystore 中私钥
+```js
+const sk = tool.readKeyStore(
+   {"publicKey":"0230632aa4863e9c0c027de7542b434adae169a8c439f595b244696bce306c8191","crypto":{"cipher":"sm4-128-ecb","cipherText":"f347b48dd1931d66d2e5bb8f4d030b3c5c5db9f32c3c763e6fadcd77de1b6886","iv":"5811eafed7a69b7f84c6b62d473afb0e","salt":"8d5196266292ff95778290983139ec427edea8639d0db37b9298924bf42879e6"},"id":"504e5c56-32da-41f8-8096-5160eda5936c","version":"1","mac":"a57423d830fd5267402838d7dc4e2ec6c54f8120797c369bc412b08585c32c88","kdf":"sm2-kdf","address":"521e3435917a9fe7b3e2841d8f9cf943758bf3e1"},
+    "123456"
+)
+```

@@ -38,3 +38,26 @@ test('build payload', () => {
     expect(buf.toString('hex')).toBe('ffff')
 })
 
+test('read key store', () => {
+    const ks = {
+        "publicKey": "03a7f9d6c7d4b8f43e66b5c79a2ab4067d81b89ceaf1d3a2078a71e829020b3f59",
+        "crypto": {
+            "cipher": "sm4-128-ecb",
+            "cipherText": "9bc5cdb736ebc5ee7db721ebdecd158796ea82d02f11bdbccb15a0b783e9dc47",
+            "iv": "35aaa95c092f0a4a9d3c90a1ca15253d",
+            "salt": "54f65f0dca0452d39b1523dcbe00894dc63793d522bfcb9316aa7878ce7d32aa"
+        },
+        "id": "e6819c35-27d7-4f68-9b5b-9980ea3e57cb",
+        "version": "1",
+        "mac": "5be73ea36c52df22e1bf0d57bd850ec7bfe9226f73da7387d91855adcb439351",
+        "kdf": "sm2-kdf",
+        "address": "0ddf6310588078f7c68c740f151a18aded7946d5"
+    }
+    expect(tool.readKeyStore(ks, '123456'))
+        .toBe('626cb1df7c489a09243ecb4d7f12ffad61cd1b7863331ac7de7364810616e14a')
+})
+
+
+test('generate key store', () => {
+    console.log(JSON.stringify(tool.createKeyStore('123456')))
+})

@@ -2,6 +2,8 @@ const BN = require('bn.js')
 const RLP = require('rlp')
 const sm3 = require('@salaku/sm-crypto').sm3
 const sm2 = require('@salaku/sm-crypto').sm2
+const sm4 = require('@salaku/sm-crypto').sm4
+const crypto = require('crypto')
 const http = require('http')
 const child_process = require('child_process');
 
@@ -483,7 +485,7 @@ function getTransactionHash(tx) {
 
 /**
  * 私钥转公钥
- * @param sk {string} 私钥
+ * @param sk {string | Buffer} 私钥
  * @returns {string}
  */
 function privateKey2PublicKey(sk) {
@@ -538,7 +540,7 @@ function buildPayload(method, parameters) {
  * @returns {string} 私钥
  */
 function generatePrivateKey(){
-    return sm2.generateKeyPairHex()[0]
+    return (sm2.generateKeyPairHex()).privateKey
 }
 
 /**
@@ -569,7 +571,9 @@ module.exports = {
     constants: constants,
     TransactionBuilder: TransactionBuilder,
     RPC: RPC,
-    generatePrivateKey: generatePrivateKey
+    generatePrivateKey: generatePrivateKey,
+    readKeyStore:readKeyStore,
+    createKeyStore: createKeyStore
 }
 
 /**
@@ -596,4 +600,85 @@ function asBuffer(x) {
     if (x instanceof Uint8Array)
         return Buffer.from(x)
     return x
+}
+
+/**
+ *
+ * @param ks {Object} keystore 对象
+ * @param password {string} 密码
+ * @return {string} 十六进制编码形式的私钥
+ */
+function readKeyStore(ks, password){
+    if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
+        throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
+    }
+    let buf = Buffer.concat([Buffer.from(ks.crypto.salt, 'hex'), Buffer.from(password, 'ascii')]);
+    const key = sm3(buf)
+    const cipherPrivKey = Buffer.from(ks.crypto.cipherText, 'hex')
+
+    return Buffer.from(sm4.decrypt(cipherPrivKey, Buffer.from(key, 'hex'))).toString('hex')
+}
+
+
+/**
+ * 生成 keystore
+ * @param {string }password 密码
+ * @param {string | Buffer | undefined} privateKey
+ * @return {Object} 生成好的 keystore
+ */
+function createKeyStore(password, privateKey){
+    if(!privateKey)
+        privateKey = generatePrivateKey()
+
+    if(typeof privateKey === 'string'){
+        privateKey = Buffer.from(privateKey, 'hex')
+    }
+
+    const ret = {
+        publicKey: '',
+        crypto: {
+            cipher: "sm4-128-ecb",
+            cipherText: '',
+            iv: '',
+            salt: ''
+        },
+        id: '',
+        version: "1",
+        mac: "",
+        kdf: "sm2-kdf",
+        address: ''
+    }
+    const salt = crypto.randomBytes(32)
+    const iv = crypto.randomBytes(16)
+    ret.publicKey = privateKey2PublicKey(privateKey)
+    ret.crypto.iv = iv.toString('hex')
+    ret.crypto.salt = salt.toString('hex')
+    ret.id = uuidv4()
+
+    let key = Buffer.from(
+        sm3(
+            Buffer.concat([salt, Buffer.from(password, 'ascii')])
+        ),
+        'hex'
+    )
+
+    key = key.slice(0, 16)
+
+    const cipherText = sm4.encrypt(
+        privateKey, key
+    )
+
+    ret.crypto.cipherText = Buffer.from(cipherText).toString('hex')
+    ret.mac = sm3(Buffer.concat(
+        [key, Buffer.from(cipherText)]
+    ))
+    ret.address = publicKey2Address(ret.publicKey)
+    return ret
+}
+
+function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }
