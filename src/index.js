@@ -140,7 +140,7 @@ class TransactionBuilder {
     /**
      * 创建转账事务（未签名）
      * @param amount 转账金额
-     * @param to 转账接收者
+     * @param to {string} 转账接收者
      * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
     buildTransfer(amount, to) {
