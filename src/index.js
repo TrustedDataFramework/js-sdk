@@ -150,26 +150,36 @@ class TransactionBuilder {
     /**
      * 构造部署合约的事务 （未签名）
      * @param payload {string | Buffer} 编译后的合约字节码
+     * @param parameters {string | Buffer } 合约的构造器参数
      * @param amount {number}
      * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
-    buildDeploy(payload, amount) {
-        if (typeof payload !== 'string')
-            payload = payload.toString('hex')
-        return this.buildCommon(constants.DEPLOY, amount, payload, '')
+    buildDeploy(binary, parameters, amount) {
+        if (typeof binary === 'string')
+            binary = Buffer.from(binary, 'hex')
+        if(!parameters)
+            parameters = Buffer.from([])
+        if(typeof parameters === 'string')
+            parameters = Buffer.from(parameters, 'hex')
+
+        let buf = Buffer.alloc(4)
+        buf.writeInt32BE(binary.length)
+
+        return this.buildCommon(constants.DEPLOY, amount, Buffer.concat([buf, binary, parameters]), '')
     }
 
     /**
      * 构造合约调用事务
      * @param addr {string} 合约地址
-     * @param payload {string | Buffer} 合约 payload 内容，用 buildPayload 构造
+     * @param method {string} 调用合约的方法
+     * @param parameters { Buffer | string} 方法参数
      * @param amount {number} 金额
-     * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+     * @returns {{createdAt: number, amount: (*|number), args: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
-    buildContractCall(addr, payload, amount) {
-        if (typeof payload !== 'string')
-            payload = payload.toString('hex')
-        return this.buildCommon(constants.CONTRACT_CALL, amount, payload, addr)
+    buildContractCall(addr, method, parameters, amount) {
+        if(!parameters)
+            parameters = ''
+        return this.buildCommon(constants.CONTRACT_CALL, amount, buildArgs(method, parameters).toString('hex'), addr)
     }
 
     /**
@@ -361,7 +371,7 @@ function rpcPost(host, port, path, data) {
  * @returns {Promise<string>}
  */
 function viewContract(host, port, address, method, parameters) {
-    const args = buildPayload(method, parameters)
+    const args = buildArgs(method, parameters)
     const url = `http://${host}:${port}/rpc/contract/${address}?args=${args.toString('hex')}`
     return rpcGet(url)
 }
@@ -526,7 +536,7 @@ function sign(tx, sk) {
  * @param parameters {string | Buffer} 调用的额外参数
  * @returns {Buffer}
  */
-function buildPayload(method, parameters) {
+function buildArgs(method, parameters) {
     const m = Buffer.from(method, 'ascii')
     const l = Buffer.from([m.length])
     if (typeof parameters === 'string')
@@ -557,7 +567,7 @@ module.exports = {
     getSignaturePlain: getSignaturePlain,
     getTransactionHash: getTransactionHash,
     sign: sign,
-    buildPayload: buildPayload,
+    buildArguments: buildArgs,
     publicKey2Address: publicKey2Address,
     privateKey2PublicKey: privateKey2PublicKey,
     getContractAddress: getContractAddress,

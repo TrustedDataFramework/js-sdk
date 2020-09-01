@@ -76,7 +76,7 @@ console.log(tool.getTransactionHash(tx).toString('hex'))
 例如调用 call 方法，填入 [255, 255] 参数
 ```js
 const tool = require('@salaku/js-sdk')
-const p = tool.buildPayload("call", Buffer.from('ffff', 'hex')).toString('hex')
+const p = tool.buildArguments("call", Buffer.from('ffff', 'hex')).toString('hex')
 console.log(p)
 ```
 
