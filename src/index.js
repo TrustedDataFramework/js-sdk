@@ -7,6 +7,184 @@ const crypto = require('crypto')
 const http = require('http')
 const child_process = require('child_process');
 
+const ABI_TYPE = {
+    FUNCTION: 'function',
+    EVENT: 'event',
+    U64: 'u64', // BN
+    STRING: 'string', // string
+    ADDRESS: 'address', //
+    BYTES: 'bytes'
+}
+
+/**
+ *
+ * @param {string | Buffer | number | BN } o before abi encode
+ * @param type encode target
+ * @returns { Buffer | string | BN }
+ */
+function convert(o, type) {
+
+    if (o instanceof Buffer) {
+        switch (type) {
+            case ABI_TYPE.U64: {
+                throw new Error('cannot convert buffer to u64')
+            }
+            case ABI_TYPE.STRING: {
+                throw new Error('cannot convert buffer to string')
+            }
+            case ABI_TYPE.ADDRESS:
+            case ABI_TYPE.BYTES: {
+                return o
+            }
+        }
+        throw new Error("unexpected abi type " + type)
+    }
+
+    if (typeof o === 'string') {
+        switch (type) {
+            case ABI_TYPE.U64: {
+                if (o.substr(0, 2) === '0x') {
+                    return new BN(o.substr(2, o.length - 2), 16)
+                }
+                return new BN(o, 10)
+            }
+            case ABI_TYPE.STRING: {
+                return o
+            }
+            case ABI_TYPE.BYTES:
+            case ABI_TYPE.ADDRESS: {
+                if (o.substr(0, 2) === '0x') {
+                    return o = o.substr(2, o.length - 2)
+                }
+                return Buffer.from(o, 'hex')
+            }
+        }
+        throw new Error("unexpected abi type " + type)
+    }
+
+    if (typeof o === 'number') {
+        switch (type) {
+            case ABI_TYPE.U64: {
+                if (o < 0)
+                    throw new Error('o is negative')
+                return new BN(o, 10)
+            }
+            case ABI_TYPE.STRING: {
+                return o.toString(10)
+            }
+            case ABI_TYPE.BYTES:
+            case ABI_TYPE.ADDRESS: {
+                throw new Error("cannot convert number to address or bytes")
+            }
+        }
+        throw new Error("unexpected abi type " + type)
+    }
+
+    if (o instanceof BN) {
+        switch (type) {
+            case ABI_TYPE.U64: {
+                return o;
+            }
+            case ABI_TYPE.STRING: {
+                return o.toString(10)
+            }
+            case ABI_TYPE.BYTES:
+            case ABI_TYPE.ADDRESS: {
+                throw new Error("cannot convert big number to address or bytes")
+            }
+        }
+        throw new Error("unexpected abi type " + type)
+    }
+
+    throw new Error("unexpected type " + o)
+}
+
+class Contract {
+    /**
+     *
+     * @param {string} address 合约地址
+     * @param {Object} abi 合约的 abi 
+     * @param {Buffer} binary 合约字节码
+     */
+    constructor(address, abi, binary) {
+        this.address = address
+        this.abi = abi
+        this.binary = binary
+    }
+
+    /**
+     *
+     * @param {string} name 调用方法名称
+     * @param { Array | Object } li 参数列表
+     * @returns { Buffer } rlp 编码后的参数
+     */
+    abiEncode(name, li) {
+        if (typeof li === 'string')
+            return Buffer.from(li, 'hex')
+        if (li instanceof Buffer)
+            return li
+        if (li === undefined || li === null)
+            return Buffer.alloc(0)
+
+        const func = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)[0]
+
+        if (Array.isArray(li)) {
+            const arr = []
+            for (let i = 0; i < li.length; i++) {
+                arr[i] = convert(li[i], func.inputs[i].type)
+            }
+            return RLP.encode(arr)
+        }
+
+        const arr = []
+        for (let i = 0; i < func.inputs.length; i++) {
+            const input = func.inputs[i]
+            arr[i] = convert(li[input.name], input.type)
+        }
+        return RLP.encode(arr)
+    }
+
+    /**
+     *
+     * @param name {string} 方法名称
+     * @param buf {Buffer | string}
+     * @returns { Array } rlp 解码后的参数列表
+     */
+    abiDecode(name, buf) {
+        if (!buf)
+            buf = ''
+        if (typeof buf === 'string')
+            buf = Buffer.from(buf, 'hex')
+        if (buf.length === 0)
+            return []
+
+        const func = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)[0]
+        const arr = RLP.decode(buf)
+        const ret = []
+        for (let i = 0; i < arr.length; i++) {
+            const t = func.outputs[i].type
+            switch (t) {
+                case ABI_TYPE.BYTES:
+                case ABI_TYPE.ADDRESS: {
+                    ret[i] = arr[i].toString('hex')
+                    break
+                }
+                case ABI_TYPE.U64: {
+                    ret[i] = new BN(arr[i].toString('hex'), 16).toString(10)
+                    break
+                }
+                case ABI_TYPE.STRING: {
+                    ret[i] = arr[i].toString('utf8')
+                    break
+                }
+            }
+        }
+        return ret
+    }
+}
+
+
+
 class RPC {
     constructor(host, port) {
         this.host = host
@@ -15,13 +193,26 @@ class RPC {
 
     /**
      * 查看合约方法
-     * @param address {string} 合约的地址
-     * @param method {string} 查看的方法
-     * @param parameters {Buffer} 额外的参数，字节数组
-     * @returns {Promise<string>}
+     * @param  { Contract } contract 合约
+     * @param {string} method  查看的方法
+     * @param { Object | Array } parameters  额外的参数，字节数组，参数列表
+     * @returns {Promise<Array>}
      */
-    viewContract(address, method, parameters) {
-        return viewContract(this.host, this.port, address, method, parameters)
+    viewContract(contract, method, parameters) {
+        if (!contract instanceof Contract)
+            throw new Error('create a instanceof Contract by new tool.Contract(addr, abi)')
+
+        if (!parameters)
+            parameters = []
+
+        if (parameters instanceof Buffer || typeof parameters === 'string')
+            throw new Error('parameters should be an raw js object or array')
+
+        const addr = contract.address
+        parameters = contract.abiEncode(method, parameters)
+
+        return viewContract(this.host, this.port, addr, method, parameters)
+            .then(r => contract.abiDecode(method, r))
     }
 
     /**
@@ -105,7 +296,7 @@ class RPC {
      * 查看投票数量排名列表
      * @returns {Promise<Object>}
      */
-    getPoSNodeInfos(){
+    getPoSNodeInfos() {
         return rpcPost(this.host, this.port, `/rpc/contract/${constants.POS_CONTRACT_ADDR}`, {
             method: 'nodeInfos'
         })
@@ -116,7 +307,7 @@ class RPC {
      * @param txHash 投票的事务哈希值
      * @returns {Promise<unknown>}
      */
-    getPoSVoteInfo(txHash){
+    getPoSVoteInfo(txHash) {
         return rpcPost(this.host, this.port, `/rpc/contract/${constants.POS_CONTRACT_ADDR}`, {
             method: 'voteInfo',
             txHash: txHash
@@ -149,18 +340,26 @@ class TransactionBuilder {
 
     /**
      * 构造部署合约的事务 （未签名）
-     * @param payload {string | Buffer} 编译后的合约字节码
-     * @param parameters {string | Buffer } 合约的构造器参数
+     * @param contract { Contract } 合约对象
+     * @param parameters { Array | Object } 合约的构造器参数
      * @param amount {number}
      * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
-    buildDeploy(binary, parameters, amount) {
-        if (typeof binary === 'string')
-            binary = Buffer.from(binary, 'hex')
-        if(!parameters)
-            parameters = Buffer.from([])
-        if(typeof parameters === 'string')
-            parameters = Buffer.from(parameters, 'hex')
+    buildDeploy(contract, parameters, amount) {
+        if (!contract instanceof Contract)
+            throw new Error('create a instanceof Contract by new tool.Contract(addr, abi)')
+
+        if (!parameters)
+            parameters = []
+
+        if (parameters instanceof Buffer || typeof parameters === 'string')
+            throw new Error('parameters should be an raw js object or array')
+
+        const binary = contract.binary
+        if (contract.abi.filter(x => x.name === 'init').length > 0)
+            parameters = contract.abiEncode('init', parameters)
+        else
+            parameters = Buffer.alloc(0)
 
         let buf = Buffer.alloc(4)
         buf.writeInt32BE(binary.length)
@@ -170,15 +369,25 @@ class TransactionBuilder {
 
     /**
      * 构造合约调用事务
-     * @param addr {string} 合约地址
+     * @param contract { Contract} 合约
      * @param method {string} 调用合约的方法
      * @param parameters { Buffer | string} 方法参数
      * @param amount {number} 金额
      * @returns {{createdAt: number, amount: (*|number), args: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
-    buildContractCall(addr, method, parameters, amount) {
-        if(!parameters)
-            parameters = ''
+    buildContractCall(contract, method, parameters, amount) {
+        if (!contract instanceof Contract)
+            throw new Error('create a instanceof Contract by new tool.Contract(addr, abi)')
+
+        if (!parameters)
+            parameters = []
+
+        if (parameters instanceof Buffer || typeof parameters === 'string')
+            throw new Error('parameters should be an raw js object or array')
+
+        const addr = contract.address
+        parameters = contract.abiEncode(method, parameters)
+
         return this.buildCommon(constants.CONTRACT_CALL, amount, buildArgs(method, parameters).toString('hex'), addr)
     }
 
@@ -186,11 +395,13 @@ class TransactionBuilder {
      * 创建事务（未签名）
      * @param type {number} 事务类型
      * @param amount {number} 金额
-     * @param payload {string}
+     * @param payload {string | Buffer }
      * @param to {string} 接收者的地址
      * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
     buildCommon(type, amount, payload, to) {
+        if (payload instanceof Buffer)
+            payload = payload.toString('hex')
         return {
             version: this.version,
             type: type,
@@ -240,7 +451,7 @@ class TransactionBuilder {
      * @param to {string} 被投票者的地址
      * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
-    buildVote(amount, to){
+    buildVote(amount, to) {
         const payload = '00' + to;
         return this.buildCommon(constants.CONTRACT_CALL, amount, payload, constants.POS_CONTRACT_ADDR)
     }
@@ -250,8 +461,8 @@ class TransactionBuilder {
      * @param hash {string | Buffer} 签名事务的哈希值
      * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
      */
-    buildCancelVote(hash){
-        if(typeof hash !== 'string'){
+    buildCancelVote(hash) {
+        if (typeof hash !== 'string') {
             hash = hash.toString('hex')
         }
         const payload = '01' + hash
@@ -450,7 +661,7 @@ function getNonce(host, port, pkOrAddress) {
 
 /**
  * 生成合约地址
- * @param pk {string | Buffer} 合约创建者的公钥
+ * @param pk {string | Buffer} 合约创建者的地址
  * @param nonce {number} 事务的 nonce
  * @returns {string} 合约的地址
  */
@@ -510,7 +721,7 @@ function privateKey2PublicKey(sk) {
  * @returns {string}
  */
 function publicKey2Address(pk) {
-    if(typeof pk === 'string')
+    if (typeof pk === 'string')
         pk = Buffer.from(pk, 'hex')
     const buf = Buffer.from(sm3(pk), 'hex')
     return buf.slice(buf.length - 20, buf.length).toString('hex')
@@ -549,7 +760,7 @@ function buildArgs(method, parameters) {
  * 生成私钥
  * @returns {string} 私钥
  */
-function generatePrivateKey(){
+function generatePrivateKey() {
     return (sm2.generateKeyPairHex()).privateKey
 }
 
@@ -559,7 +770,7 @@ function generatePrivateKey(){
  * @param sk 你的私钥
  * @returns {Object}
  */
-function generateSecretStore(pk, sk){
+function generateSecretStore(pk, sk) {
     return sm2.doEncrypt()
 }
 
@@ -567,24 +778,18 @@ module.exports = {
     getSignaturePlain: getSignaturePlain,
     getTransactionHash: getTransactionHash,
     sign: sign,
-    buildArguments: buildArgs,
     publicKey2Address: publicKey2Address,
     privateKey2PublicKey: privateKey2PublicKey,
     getContractAddress: getContractAddress,
-    getNonce: getNonce,
-    sendTransaction: sendTransaction,
-    getTransaction: getTransaction,
-    getBlock: getBlock,
-    getHeader: getHeader,
-    viewContract: viewContract,
     compileContract: compileContract,
     constants: constants,
     TransactionBuilder: TransactionBuilder,
     RPC: RPC,
     generatePrivateKey: generatePrivateKey,
-    readKeyStore:readKeyStore,
+    readKeyStore: readKeyStore,
     createKeyStore: createKeyStore,
-    createAuthServer: createAuthServer
+    createAuthServer: createAuthServer,
+    Contract: Contract
 }
 
 /**
@@ -593,9 +798,7 @@ module.exports = {
  * @returns {BN}
  */
 function asBigInteger(x) {
-    if (typeof x === 'string')
-        return new BN(x, 10)
-    return x
+    return convert(x, ABI_TYPE.U64).toString(10)
 }
 
 /**
@@ -619,7 +822,7 @@ function asBuffer(x) {
  * @param password {string} 密码
  * @return {string} 十六进制编码形式的私钥
  */
-function readKeyStore(ks, password){
+function readKeyStore(ks, password) {
     if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
         throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
     }
@@ -637,11 +840,11 @@ function readKeyStore(ks, password){
  * @param {string | Buffer | undefined} privateKey
  * @return {Object} 生成好的 keystore
  */
-function createKeyStore(password, privateKey){
-    if(!privateKey)
+function createKeyStore(password, privateKey) {
+    if (!privateKey)
         privateKey = generatePrivateKey()
 
-    if(typeof privateKey === 'string'){
+    if (typeof privateKey === 'string') {
         privateKey = Buffer.from(privateKey, 'hex')
     }
 
@@ -688,7 +891,7 @@ function createKeyStore(password, privateKey){
 }
 
 function uuidv4() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
@@ -700,18 +903,18 @@ function uuidv4() {
  * @param privateKey {string | Buffer} 私钥
  * @returns {Object}
  */
-function createAuthServer(privateKey, whiteList){
-    const URL  = require('url');
+function createAuthServer(privateKey, whiteList) {
+    const URL = require('url');
     const http = require('http')
     const server = http.createServer()
 
     server.on('request', function (request, response) {
 
         let otherPublicKey = URL.parse(request.url, true).query['publicKey']
-        if(whiteList && whiteList.length){
+        if (whiteList && whiteList.length) {
             const exists = whiteList.map(x => x === otherPublicKey)
                 .reduce((x, y) => x || y, false)
-            if(!exists)
+            if (!exists)
                 throw new Error(`invalid public key, not in white list ${otherPublicKey}`)
         }
 
