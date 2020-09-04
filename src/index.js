@@ -13,7 +13,8 @@ const ABI_TYPE = {
     U64: 'u64', // BN
     STRING: 'string', // string
     ADDRESS: 'address', //
-    BYTES: 'bytes'
+    BYTES: 'bytes',
+    U256: 'u256'
 }
 
 /**
@@ -26,8 +27,9 @@ function convert(o, type) {
 
     if (o instanceof Buffer) {
         switch (type) {
+            case ABI_TYPE.U256:
             case ABI_TYPE.U64: {
-                throw new Error('cannot convert buffer to u64')
+                throw new Error('cannot convert buffer to u64 or u256')
             }
             case ABI_TYPE.STRING: {
                 throw new Error('cannot convert buffer to string')
@@ -42,6 +44,7 @@ function convert(o, type) {
 
     if (typeof o === 'string') {
         switch (type) {
+            case ABI_TYPE.U256:
             case ABI_TYPE.U64: {
                 if (o.substr(0, 2) === '0x') {
                     return new BN(o.substr(2, o.length - 2), 16)
@@ -64,6 +67,7 @@ function convert(o, type) {
 
     if (typeof o === 'number') {
         switch (type) {
+            case ABI_TYPE.U256:
             case ABI_TYPE.U64: {
                 if (o < 0)
                     throw new Error('o is negative')
@@ -82,6 +86,7 @@ function convert(o, type) {
 
     if (o instanceof BN) {
         switch (type) {
+            case ABI_TYPE.U256:
             case ABI_TYPE.U64: {
                 return o;
             }
@@ -169,6 +174,7 @@ class Contract {
                     ret[i] = arr[i].toString('hex')
                     break
                 }
+                case ABI_TYPE.U256:
                 case ABI_TYPE.U64: {
                     ret[i] = new BN(arr[i].toString('hex'), 16).toString(10)
                     break
