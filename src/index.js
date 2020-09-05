@@ -17,9 +17,7 @@
     const isBrowser = env === ENVS.BROWSER
 
 
-    const BN = isBrowser ? this.BN : require('bn.js')
-
-
+    const BN = isBrowser ? window['BN'] : require('bn.js')
     const sm3 = isBrowser ? this.sm3 : require('@salaku/sm-crypto').sm3
     const sm2 = isBrowser ? this.sm2 : require('@salaku/sm-crypto').sm2
     const sm4 = isBrowser ? this.sm4 : require('@salaku/sm-crypto').sm4
@@ -28,6 +26,14 @@
     const http = isBrowser ? null : require('http')
     const child_process = isBrowser ? null : require('child_process');
 
+    function randomBytes(length) {
+        if (!isBrowser)
+            return crypto.randomBytes(length)
+
+        const ret = new Uint8Array(length);
+        window.crypto.getRandomValues(ret);
+        return ret
+    }
 
     const assert = this['assert'] ? this['assert'] : (truth, msg) => {
         if (!truth)
@@ -58,6 +64,136 @@
             ret[i] = (hexToInt(h) << 4) + hexToInt(l);
         }
         return ret;
+    }
+
+    /**
+     *
+     * @param {string} hex
+     * @returns
+     */
+    function isHex(hex) {
+        if (hex.length % 2 !== 0)
+            return false
+        hex = hex.toLowerCase()
+        for (let i = 0; i < hex.length; i++) {
+            const code = hex.charCodeAt(i)
+            if ((code >= 48 && code <= 57) || (code >= 97 && code <= 102)) {
+            } else {
+                return false
+            }
+        }
+        return true
+    }
+
+    /**
+     * convert bytes like objects to hex string
+     * @param {string | ArrayBuffer | Uint8Array } s
+     * @returns {string}
+     */
+    function bin2hex(s) {
+        if (typeof s === 'string' && s.startsWith('0x'))
+            s = s.substr(2)
+        if (typeof s === 'string') {
+            assert(isHex(s), `invalid hex string ${s}`)
+        }
+        if (isBytes(s))
+            return encodeHex(s)
+    }
+
+    /**
+     * convert digital like objects to digital string
+     * @param {string | BN | number } s
+     * @returns {string}
+     */
+    function asDigitalNumberText(s) {
+        if (typeof s === 'string') {
+            if (s.startsWith('0x'))
+                s = new BN(s.substr(2), 16)
+            else
+                s = new BN(s, 10)
+        }
+        return s.toString(10)
+    }
+
+    class TypeDef {
+        /**
+         *
+         * @param {string} type
+         * @param {string} name
+         */
+        constructor(type, name) {
+            assert(
+                type === ABI_DATA_TYPE.STRING
+                || type === ABI_DATA_TYPE.U64
+                || type === ABI_DATA_TYPE.ADDRESS
+                || type === ABI_DATA_TYPE.BYTES
+                || type === ABI_DATA_TYPE.U256,
+                `invalid abi type def type = ${type}`
+            )
+            this.type = type
+            this.name = name
+        }
+
+        /**
+         *
+         * @param {Object} o
+         * @return {TypeDef}
+         */
+        static from(o) {
+            return new TypeDef(o.type, o.name)
+        }
+    }
+
+    class ABI {
+        /**
+         *
+         * @param {string} name
+         * @param {string} type
+         * @param {Array<TypeDef> } inputs
+         * @param {Array<TypeDef>} outputs
+         */
+        constructor(name, type, inputs, outputs) {
+            assert(name, 'expect name of abi')
+            assert(type === ABI_TYPE.FUNCTION || type === ABI_TYPE.EVENT, `invalid abi type ${type}`)
+            assert(!inputs || Array.isArray(inputs), `invalid inputs ${inputs}`)
+            assert(!outputs || Array.isArray(outputs), `invalid inputs ${outputs}`)
+
+            this.name = name
+            this.type = type
+            this.inputs = (inputs || []).map(TypeDef.from)
+            this.outputs = (outputs || []).map(TypeDef.from)
+        }
+
+        static from(o) {
+            return new ABI(o.name, o.type, o.inputs, o.outputs)
+        }
+    }
+    class Transaction {
+        /**
+         *
+         * @param {string | number | BN} [version]
+         * @param {string | number | BN} [type]
+         * @param {string | number | BN} [createdAt]
+         * @param {string | number | BN} [nonce]
+         * @param {string | Uint8Array | ArrayBuffer} [from]
+         * @param {string | number | BN} [gasPrice]
+         * @param {string | number | BN} [amount]
+         * @param {string | Uint8Array | ArrayBuffer } [payload]
+         * @param {string | Uint8Array | ArrayBuffer} [to]
+         * @param {string | Uint8Array | ArrayBuffer } [signature]
+         */
+        constructor(version, type, createdAt, nonce, from, gasPrice, amount, payload, to, signature) {
+            this.version = asDigitalNumberText(version || '0')
+            this.type = asDigitalNumberText(type || '0')
+            this.createdAt = asDigitalNumberText(createdAt || '0')
+            this.nonce = asDigitalNumberText(nonce || '0')
+            this.from = bin2hex(from || '')
+            this.gasPrice = asDigitalNumberText(gasPrice || '0')
+            this.amount = asDigitalNumberText(amount || '0')
+            this.payload = bin2hex(payload || '')
+            this.to = bin2hex(to || '')
+            this.signature = bin2hex(signature || '')
+        }
     }
 
     /**
@@ -184,7 +320,7 @@
 
     /**
      * encode bytes to rlp
-     * @param { ArrayBuffer | Uint8Array } bytes 
+     * @param { ArrayBuffer | Uint8Array } bytes
      * @returns { Uint8Array }
      */
     function encodeBytes(bytes) {
@@ -232,7 +368,7 @@
 
     /**
      * encode elements to rlp list
-     * @param { Array<Uint8Array> } elements 
+     * @param { Array<Uint8Array> } elements
      * @returns { Uint8Array } rlp encoded
      */
     function encodeElements(elements) {
@@ -337,7 +473,7 @@
         }
 
         /**
-         * 
+         *
          * @param { Uint8Array | string | Array | ArrayBuffer | number | BN | null} o
          */
         static encode(o) {
@@ -363,7 +499,7 @@
 
 
         /**
-         * decode 
+         * decode
          * @param { ArrayBuffer | Uint8Array } encoded encoded rlp bytes
          * @returns { Array | Uint8Array }
          */
@@ -455,14 +591,17 @@
         }
     }
 
-    const ABI_TYPE = {
-        FUNCTION: 'function',
-        EVENT: 'event',
+    const ABI_DATA_TYPE = {
         U64: 'u64', // BN
         STRING: 'string', // string
         ADDRESS: 'address', //
         BYTES: 'bytes',
         U256: 'u256'
+    }
+
+    const ABI_TYPE = {
+        EVENT: 'event',
+        FUNCTION: 'function'
     }
 
     /**
@@ -476,15 +615,15 @@
             o = toU8Arr(o)
         if (o instanceof Uint8Array) {
             switch (type) {
-                case ABI_TYPE.U256:
-                case ABI_TYPE.U64: {
+                case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.U64: {
                     throw new Error('cannot convert uint8array to u64 or u256')
                 }
-                case ABI_TYPE.STRING: {
+                case ABI_DATA_TYPE.STRING: {
                     throw new Error('cannot convert uint8array to string')
                 }
-                case ABI_TYPE.ADDRESS:
-                case ABI_TYPE.BYTES: {
+                case ABI_DATA_TYPE.ADDRESS:
+                case ABI_DATA_TYPE.BYTES: {
                     return o
                 }
             }
@@ -493,25 +632,25 @@
 
         if (typeof o === 'string') {
             switch (type) {
-                case ABI_TYPE.U256:
-                case ABI_TYPE.U64: {
+                case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.U64: {
                     let ret;
                     if (o.substr(0, 2) === '0x') {
                         ret = new BN(o.substr(2, o.length - 2), 16)
                     } else {
                         ret = new BN(o, 10)
                     }
-                    if (type === ABI_TYPE.U64)
+                    if (type === ABI_DATA_TYPE.U64)
                         assert(ret.cmp(MAX_U64) <= 0, `${ret.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
-                    if (type === ABI_TYPE.U256)
+                    if (type === ABI_DATA_TYPE.U256)
                         assert(ret.cmp(MAX_U256) <= 0, `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                     return ret
                 }
-                case ABI_TYPE.STRING: {
+                case ABI_DATA_TYPE.STRING: {
                     return o
                 }
-                case ABI_TYPE.BYTES:
-                case ABI_TYPE.ADDRESS: {
+                case ABI_DATA_TYPE.BYTES:
+                case ABI_DATA_TYPE.ADDRESS: {
                     if (o.substr(0, 2) === '0x') {
                         o = o.substr(2, o.length - 2)
                     }
@@ -523,17 +662,17 @@
 
         if (typeof o === 'number') {
             switch (type) {
-                case ABI_TYPE.U256:
-                case ABI_TYPE.U64: {
+                case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.U64: {
                     if (o < 0)
                         throw new Error('o is negative')
                     return new BN(o, 10)
                 }
-                case ABI_TYPE.STRING: {
+                case ABI_DATA_TYPE.STRING: {
                     return o.toString(10)
                 }
-                case ABI_TYPE.BYTES:
-                case ABI_TYPE.ADDRESS: {
+                case ABI_DATA_TYPE.BYTES:
+                case ABI_DATA_TYPE.ADDRESS: {
                     throw new Error("cannot convert number to address or bytes")
                 }
             }
@@ -542,15 +681,15 @@
 
         if (o instanceof BN) {
             switch (type) {
-                case ABI_TYPE.U256:
-                case ABI_TYPE.U64: {
+                case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.U64: {
                     return o;
                 }
-                case ABI_TYPE.STRING: {
+                case ABI_DATA_TYPE.STRING: {
                     return o.toString(10)
                 }
-                case ABI_TYPE.BYTES:
-                case ABI_TYPE.ADDRESS: {
+                case ABI_DATA_TYPE.BYTES:
+                case ABI_DATA_TYPE.ADDRESS: {
                     throw new Error("cannot convert big number to address or bytes")
                 }
             }
@@ -564,12 +703,12 @@
         /**
          *
          * @param {string} address 合约地址
-         * @param {Object} abi 合约的 abi 
+         * @param { Array<ABI> } abi 合约的 abi
          * @param {Uint8Array} binary 合约字节码
          */
         constructor(address, abi, binary) {
             this.address = address
-            this.abi = abi
+            this.abi = (abi || []).map(ABI.from)
             this.binary = binary
         }
 
@@ -626,21 +765,22 @@
             for (let i = 0; i < arr.length; i++) {
                 const t = func.outputs[i].type
                 switch (t) {
-                    case ABI_TYPE.BYTES:
-                    case ABI_TYPE.ADDRESS: {
+                    case ABI_DATA_TYPE.BYTES:
+                    case ABI_DATA_TYPE.ADDRESS: {
                         ret[i] = encodeHex(arr[i])
                         break
                     }
-                    case ABI_TYPE.U256:
-                    case ABI_TYPE.U64: {
-                        ret[i] = new BN(arr[i].toString('hex'), 16).toString(10)
-                        if (t === ABI_TYPE.U64)
-                            assert(ret[i].compareTo(MAX_U64) <= 0, `${ret.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
-                        if (t === ABI_TYPE.U256)
-                            assert(ret[i].compareTo(MAX_U256) <= 0, `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
-                        return ret
+                    case ABI_DATA_TYPE.U256:
+                    case ABI_DATA_TYPE.U64: {
+                        ret[i] = new BN(arr[i], 'be')
+                        if (t === ABI_DATA_TYPE.U64)
+                            assert(ret[i].cmp(MAX_U64) <= 0, `${ret.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
+                        if (t === ABI_DATA_TYPE.U256)
+                            assert(ret[i].cmp(MAX_U256) <= 0, `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
+                        ret[i] = ret[i].toString(10)
+                        break
                     }
-                    case ABI_TYPE.STRING: {
+                    case ABI_DATA_TYPE.STRING: {
                         ret[i] = bin2str(arr[i])
                         break
                     }
@@ -649,7 +789,6 @@
             return ret
         }
     }
-
 
 
     class RPC {
@@ -801,15 +940,15 @@
         }
 
         increaseNonce() {
-            this.nonce = convert(this.nonce, ABI_TYPE.U64)
+            this.nonce = convert(this.nonce, ABI_DATA_TYPE.U64)
             this.nonce = this.nonce.add(new BN(1))
         }
 
         /**
          * 创建转账事务（未签名）
          * @param amount 转账金额
-         * @param to {string} 转账接收者
-         * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+         * @param to { string } 转账接收者
+         * @returns { Transaction }
          */
         buildTransfer(amount, to) {
             return this.buildCommon(constants.TRANSFER, amount, '', to)
@@ -820,7 +959,7 @@
          * @param contract { Contract } 合约对象
          * @param parameters { Array | Object } 合约的构造器参数
          * @param amount {number}
-         * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+         * @returns { Transaction }
          */
         buildDeploy(contract, parameters, amount) {
             if (!contract instanceof Contract)
@@ -855,9 +994,9 @@
          * 构造合约调用事务
          * @param contract { Contract} 合约
          * @param method {string} 调用合约的方法
-         * @param parameters { Buffer | string} 方法参数
+         * @param parameters { Array | Object } 方法参数
          * @param amount {number} 金额
-         * @returns {{createdAt: number, amount: (*|number), args: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+         * @returns { Transaction }
          */
         buildContractCall(contract, method, parameters, amount) {
             if (!contract instanceof Contract)
@@ -883,30 +1022,25 @@
 
         /**
          * 创建事务（未签名）
-         * @param type {number} 事务类型
+         * @param type {number | string | BN} 事务类型
          * @param amount {number | BN | string} 金额
-         * @param payload {string | Uint8Array }
-         * @param to {string} 接收者的地址
-         * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+         * @param payload {string | Uint8Array | ArrayBuffer}
+         * @param to {string | Uint8Array | ArrayBuffer } 接收者的地址
+         * @returns { Transaction } 构造好的事务
          */
         buildCommon(type, amount, payload, to) {
-            if (amount instanceof BN)
-                amount = amount.toString(10)
-            if (isBytes(payload))
-                payload = encodeHex(payload)
+            const ret = new Transaction(
+                this.version,
+                type,
+                Math.floor((new Date()).valueOf() / 1000),
+                0,
+                privateKey2PublicKey(this.sk),
+                this.gasPrice,
+                amount || 0,
+                payload || '',
+                to
+            )
 
-            const gasPrice = this.gasPrice instanceof BN ? this.gasPrice.toString(10) : this.gasPrice;
-
-            const ret = {
-                version: this.version,
-                type: type,
-                createdAt: Math.floor((new Date()).valueOf() / 1000),
-                from: privateKey2PublicKey(this.sk),
-                gasPrice: gasPrice,
-                amount: amount || 0,
-                payload: payload || '',
-                to: to
-            }
             if (this.nonce) {
                 ret.nonce = typeof this.nonce == 'string' ? this.nonce : this.nonce.toString(10)
                 this.increaseNonce()
@@ -918,7 +1052,7 @@
         /**
          * 构造加入请求事务（未签名）
          * @param address {string} 合约地址
-         * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+         * @returns { Transaction }
          */
         buildAuthJoin(address) {
             const payload = '00'
@@ -929,7 +1063,7 @@
          * 构造同意加入的请求（未签名）
          * @param contractAddress {string} 合约地址
          * @param approvedAddress {string} 同意加入的地址
-         * @returns {{createdAt: number, amount: (*|number), payload: (*|string), from: string, to: *, type: *, version: (number|string), gasPrice: number}}
+         * @returns { Transaction }
          */
         buildAuthApprove(contractAddress, approvedAddress) {
             const payload = '01' + approvedAddress
@@ -972,7 +1106,7 @@
 
         /**
          * 对事务作出签名
-         * @param tx 事务
+         * @param { Transaction }tx 事务
          */
         sign(tx) {
             sign(tx, this.sk)
@@ -999,6 +1133,8 @@
      * @returns {Promise<Buffer>}
      */
     function compileContract(ascPath, src) {
+        if (isBrowser)
+            throw new Error('compile contract is available in node environment')
         return new Promise((resolve, reject) => {
             child_process.exec(
                 ascPath + ' ' + src + ' --optimize -b', // 执行的命令
@@ -1036,12 +1172,30 @@
                     })
                     .on('error', reject)
             })
-        assert(!host, 'cannot make cors request in browser environment')
+        else
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4) {
+                        const resp = JSON.parse(xhr.responseText);
+                        if (resp.code === 200){
+                            resolve(resp.data)
+                        }
+                        else {
+                            reject(resp.message)
+                        }
+                    }
+                };
+                xhr.open('GET', url);
+                xhr.send()
+            })
     }
 
     function rpcPost(host, port, path, data) {
+        if (!path.startsWith('/'))
+            path = '/' + path
         data = typeof data === 'string' ? data : JSON.stringify(data)
-        if (!isBrowser)
+        if (!isBrowser) {
             return new Promise((resolve, reject) => {
                 const opt = {
                     host: host,
@@ -1074,7 +1228,27 @@
                 req.write(data)
                 req.end()
             })
-        assert(!host, 'cannot make cors request in browser environment')
+        } else {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.setRequestHeader('Content-Type', 'application/json')
+
+                xhr.onload = function () {
+                    if (xhr.status !== 200) {
+                        reject('server error')
+                        return
+                    }
+                    const resp = JSON.parse(xhr.responseText);
+                    if (resp.code === 200)
+                        resolve(resp.data)
+                    else {
+                        reject(resp.message)
+                    }
+                }
+                xhr.open('POST', `http://${host}:${port}${path}`);
+                xhr.send(data)
+            })
+        }
     }
 
     /**
@@ -1172,52 +1346,51 @@
      */
     function getContractAddress(address, nonce) {
         nonce = nonce ? nonce : 0
-        address = convert(address, ABI_TYPE.ADDRESS)
+        address = convert(address, ABI_DATA_TYPE.ADDRESS)
         if (address.length != 20)
             throw new Error(`address length should be 20 while ${address.length} found`)
-        let buf = RLP.encode([address, convert(nonce, ABI_TYPE.U64)])
+        let buf = RLP.encode([address, convert(nonce, ABI_DATA_TYPE.U64)])
         buf = decodeHex(sm3(buf), 'hex')
         return encodeHex(buf.slice(buf.length - 20, buf.length))
     }
 
     /**
      * 获得事务签名原文
-     * @param tx 事务
+     * @param { Transaction } tx 事务
      * @returns {Buffer}
      */
     function getSignaturePlain(tx) {
         const arr = [
-            tx['version'] ? convert(tx['version'], ABI_TYPE.U64) : 0,
-            tx['type'] ? convert(tx['type'], ABI_TYPE.U64) : 0,
-            tx['createdAt'] ? convert(tx['createdAt'], ABI_TYPE.U64) : 0,
-            tx['nonce'] ? convert(tx['nonce'], ABI_TYPE.U64) : 0,
-            tx['from'] ? convert(tx['from'], ABI_TYPE.BYTES) : null,
-            tx['gasPrice'] ? convert(tx['gasPrice'], ABI_TYPE.U256) : 0,
-            tx['amount'] ? convert(tx['amount'], ABI_TYPE.U256) : 0,
-            tx['payload'] ? convert(tx['payload'], ABI_TYPE.BYTES) : null,
-            tx['to'] ? convert(tx['to'], ABI_TYPE.ADDRESS) : null,
+            convert(tx.version || 0, ABI_DATA_TYPE.U64),
+            convert(tx.type || 0, ABI_DATA_TYPE.U64),
+            convert(tx.createdAt || '0', ABI_DATA_TYPE.U64),
+            convert(tx.nonce || '0', ABI_DATA_TYPE.U64),
+            convert(tx.from || EMPTY_BYTES, ABI_DATA_TYPE.BYTES),
+            convert(tx.gasPrice || '0', ABI_DATA_TYPE.U256),
+            convert(tx.amount || '0', ABI_DATA_TYPE.U256),
+            convert(tx.payload || '0', ABI_DATA_TYPE.BYTES),
+            convert(tx.to || EMPTY_BYTES, ABI_DATA_TYPE.ADDRESS)
         ]
         return RLP.encode(arr)
     }
 
     /**
      * 获取事务哈希值
-     * @param tx 事务
-     * @returns {Buffer}
+     * @param { Transaction }tx 事务
+     * @returns { string }
      */
     function getTransactionHash(tx) {
         const buf = getSignaturePlain(tx)
-        return Buffer.from(sm3(buf), 'hex')
+        return sm3(buf)
     }
 
     /**
      * 私钥转公钥
-     * @param sk {string | Buffer} 私钥
+     * @param sk {string | Uint8Array | ArrayBuffer} 私钥
      * @returns {string}
      */
     function privateKey2PublicKey(sk) {
-        if (sk instanceof Buffer)
-            sk = sk.toString('hex')
+        sk = bin2hex(sk)
         return sm2.compress(sm2.getPKFromSK(sk))
     }
 
@@ -1228,14 +1401,14 @@
      */
     function publicKey2Address(pk) {
         if (typeof pk === 'string')
-            pk = Buffer.from(pk, 'hex')
-        const buf = Buffer.from(sm3(pk), 'hex')
-        return buf.slice(buf.length - 20, buf.length).toString('hex')
+            pk = decodeHex(pk)
+        const buf = decodeHex(sm3(pk))
+        return encodeHex(buf.slice(buf.length - 20, buf.length))
     }
 
     /**
      * 对事务作出签名
-     * @param tx 事务
+     * @param { Transaction } tx 事务
      * @param sk 私钥
      */
     function sign(tx, sk) {
@@ -1270,34 +1443,33 @@
         return (sm2.generateKeyPairHex()).privateKey
     }
 
-    /**
-     * 生成证书
-     * @param pk 公钥
-     * @param sk 你的私钥
-     * @returns {Object}
-     */
-    function generateSecretStore(pk, sk) {
-        return sm2.doEncrypt()
+    const tool = {
+        getSignaturePlain: getSignaturePlain,
+        getTransactionHash: getTransactionHash,
+        sign: sign,
+        publicKey2Address: publicKey2Address,
+        privateKey2PublicKey: privateKey2PublicKey,
+        getContractAddress: getContractAddress,
+        compileContract: compileContract,
+        constants: constants,
+        TransactionBuilder: TransactionBuilder,
+        RPC: RPC,
+        generatePrivateKey: generatePrivateKey,
+        readKeyStore: readKeyStore,
+        createKeyStore: createKeyStore,
+        createAuthServer: createAuthServer,
+        Contract: Contract,
+        Transaction: Transaction,
+        randomBytes: randomBytes,
+        encodeHex: encodeHex,
+        decodeHex: decodeHex
     }
 
     if (!isBrowser)
-        module.exports = {
-            getSignaturePlain: getSignaturePlain,
-            getTransactionHash: getTransactionHash,
-            sign: sign,
-            publicKey2Address: publicKey2Address,
-            privateKey2PublicKey: privateKey2PublicKey,
-            getContractAddress: getContractAddress,
-            compileContract: compileContract,
-            constants: constants,
-            TransactionBuilder: TransactionBuilder,
-            RPC: RPC,
-            generatePrivateKey: generatePrivateKey,
-            readKeyStore: readKeyStore,
-            createKeyStore: createKeyStore,
-            createAuthServer: createAuthServer,
-            Contract: Contract
-        }
+        module.exports = tool
+    else {
+        window.tool = tool
+    }
 
     /**
      *
@@ -1309,18 +1481,20 @@
         if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
             throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
         }
-        let buf = Buffer.concat([Buffer.from(ks.crypto.salt, 'hex'), Buffer.from(password, 'ascii')]);
+        let buf = concatBytes([decodeHex(ks.crypto.salt), str2bin(password)]);
         const key = sm3(buf)
-        const cipherPrivKey = Buffer.from(ks.crypto.cipherText, 'hex')
+        const cipherPrivKey = decodeHex(ks.crypto.cipherText)
 
-        return Buffer.from(sm4.decrypt(cipherPrivKey, Buffer.from(key, 'hex'))).toString('hex')
+        return encodeHex(
+            sm4.decrypt(cipherPrivKey, decodeHex(key))
+        )
     }
 
 
     /**
      * 生成 keystore
-     * @param {string }password 密码
-     * @param {string | Buffer | undefined} privateKey
+     * @param {string } password 密码
+     * @param {string | Uint8Array | undefined} privateKey
      * @return {Object} 生成好的 keystore
      */
     function createKeyStore(password, privateKey) {
@@ -1328,7 +1502,7 @@
             privateKey = generatePrivateKey()
 
         if (typeof privateKey === 'string') {
-            privateKey = Buffer.from(privateKey, 'hex')
+            privateKey = decodeHex(privateKey)
         }
 
         const ret = {
@@ -1345,29 +1519,31 @@
             kdf: "sm2-kdf",
             address: ''
         }
-        const salt = crypto.randomBytes(32)
-        const iv = crypto.randomBytes(16)
+        const salt = randomBytes(32)
+        const iv = randomBytes(16)
         ret.publicKey = privateKey2PublicKey(privateKey)
-        ret.crypto.iv = iv.toString('hex')
-        ret.crypto.salt = salt.toString('hex')
+        ret.crypto.iv = encodeHex(iv)
+        ret.crypto.salt = encodeHex(salt)
         ret.id = uuidv4()
 
-        let key = Buffer.from(
+        let key = decodeHex(
             sm3(
-                Buffer.concat([salt, Buffer.from(password, 'ascii')])
+                concatBytes([salt, str2bin(password)])
             ),
             'hex'
         )
 
         key = key.slice(0, 16)
 
-        const cipherText = sm4.encrypt(
+        let cipherText = sm4.encrypt(
             privateKey, key
         )
 
-        ret.crypto.cipherText = Buffer.from(cipherText).toString('hex')
-        ret.mac = sm3(Buffer.concat(
-            [key, Buffer.from(cipherText)]
+        cipherText = new Uint8Array(cipherText)
+
+        ret.crypto.cipherText = encodeHex(cipherText)
+        ret.mac = sm3(concatBytes(
+            [key, cipherText]
         ))
         ret.address = publicKey2Address(ret.publicKey)
         return ret
