@@ -794,9 +794,15 @@
 
 
     class RPC {
+
+        /**
+         * 
+         * @param {string} host  主机名
+         * @param {string | number} port  端口号
+         */
         constructor(host, port) {
-            this.host = host
-            this.port = port
+            this.host = host || 'localhost'
+            this.port = port || 80
         }
 
         /**
