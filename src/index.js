@@ -447,7 +447,7 @@
             return ret;
         }
 
-        bytes() {
+        bytes(n) {
             assert(this.offset + n <= this.limit, 'read overflow');
             const ret = this.buf.slice(this.offset, this.offset + n);
             this.offset += n;
@@ -497,7 +497,7 @@
                 case ABI_TYPE.U64: {
                     let ret;
                     if (o.substr(0, 2) === '0x') {
-                        ret = BN(o.substr(2, o.length - 2), 16)
+                        ret = new BN(o.substr(2, o.length - 2), 16)
                     } else {
                         ret = new BN(o, 10)
                     }
@@ -513,7 +513,7 @@
                 case ABI_TYPE.BYTES:
                 case ABI_TYPE.ADDRESS: {
                     if (o.substr(0, 2) === '0x') {
-                        return o = o.substr(2, o.length - 2)
+                        o = o.substr(2, o.length - 2)
                     }
                     return decodeHex(o)
                 }
@@ -628,7 +628,7 @@
                 switch (t) {
                     case ABI_TYPE.BYTES:
                     case ABI_TYPE.ADDRESS: {
-                        ret[i] = arr[i].toString('hex')
+                        ret[i] = encodeHex(arr[i])
                         break
                     }
                     case ABI_TYPE.U256:
@@ -641,7 +641,7 @@
                         return ret
                     }
                     case ABI_TYPE.STRING: {
-                        ret[i] = arr[i].toString('utf8')
+                        ret[i] = bin2str(arr[i])
                         break
                     }
                 }
@@ -908,7 +908,7 @@
                 to: to
             }
             if (this.nonce) {
-                ret.nonce = this.nonce
+                ret.nonce = typeof this.nonce == 'string' ? this.nonce : this.nonce.toString(10)
                 this.increaseNonce()
                 this.sign(ret)
             }
