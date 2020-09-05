@@ -91,13 +91,15 @@
      * @returns {string}
      */
     function bin2hex(s) {
-        if (typeof s === 'string' && s.startsWith('0x'))
+        if (typeof s === 'string' && s.startsWith('0x')){
             s = s.substr(2)
+        }
         if (typeof s === 'string') {
             assert(isHex(s), `invalid hex string ${s}`)
         }
         if (isBytes(s))
             return encodeHex(s)
+        return s
     }
 
     /**
