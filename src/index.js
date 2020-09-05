@@ -26,6 +26,12 @@
     const http = isBrowser ? null : require('http')
     const child_process = isBrowser ? null : require('child_process');
 
+
+    /**
+     * 随机生成 Uint8Array
+     * @param {number} length 长度
+     * @return {Uint8Array}
+     */
     function randomBytes(length) {
         if (!isBrowser)
             return crypto.randomBytes(length)
@@ -42,6 +48,24 @@
 
     const MAX_U64 = new BN('ffffffffffffffff', 16);
     const MAX_U256 = new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16);
+
+    /**
+     * @param { Uint8Array | ArrayBuffer }
+     */
+    function trimLeadingZeros(data) {
+        assert(isBytes(data), 'data is not bytes')
+        data = toU8Arr(data)
+        let k = -1;
+        for (let i = 0; i < data.length; i++) {
+            if (data[i] !== 0) {
+                k = i;
+                break;
+            }
+        }
+        if (k === -1)
+            return new Uint8Array(0)
+        return data.slice(k, data.length)
+    }
 
     function hexToInt(x) {
         if (48 <= x && x <= 57) return x - 48;
@@ -91,7 +115,7 @@
      * @returns {string}
      */
     function bin2hex(s) {
-        if (typeof s === 'string' && s.startsWith('0x')){
+        if (typeof s === 'string' && s.startsWith('0x')) {
             s = s.substr(2)
         }
         if (typeof s === 'string') {
@@ -170,6 +194,7 @@
             return new ABI(o.name, o.type, o.inputs, o.outputs)
         }
     }
+
     class Transaction {
         /**
          *
@@ -178,29 +203,71 @@
          * @param {string | number | BN} [createdAt]
          * @param {string | number | BN} [nonce]
          * @param {string | Uint8Array | ArrayBuffer} [from]
+         * @param {string | BN | number } [gasLimit]
          * @param {string | number | BN} [gasPrice]
          * @param {string | number | BN} [amount]
          * @param {string | Uint8Array | ArrayBuffer } [payload]
          * @param {string | Uint8Array | ArrayBuffer} [to]
          * @param {string | Uint8Array | ArrayBuffer } [signature]
          */
-        constructor(version, type, createdAt, nonce, from, gasPrice, amount, payload, to, signature) {
-            this.version = asDigitalNumberText(version || '0')
-            this.type = asDigitalNumberText(type || '0')
-            this.createdAt = asDigitalNumberText(createdAt || '0')
-            this.nonce = asDigitalNumberText(nonce || '0')
+        constructor(version, type, createdAt, nonce, from, gasLimit, gasPrice, amount, payload, to, signature) {
+            if (isNaN(createdAt)) {
+                try {
+                    createdAt = (new Date(createdAt).valueOf()) / 1000
+                } catch (ignored) {
+
+                }
+            }
+            this.version = asDigitalNumberText(version || 0)
+            this.type = asDigitalNumberText(type || 0)
+            this.createdAt = asDigitalNumberText(createdAt || 0)
+            this.nonce = asDigitalNumberText(nonce || 0)
             this.from = bin2hex(from || '')
-            this.gasPrice = asDigitalNumberText(gasPrice || '0')
-            this.amount = asDigitalNumberText(amount || '0')
+            this.gasLimit = asDigitalNumberText(gasLimit || 0)
+            this.gasPrice = asDigitalNumberText(gasPrice || 0)
+            this.amount = asDigitalNumberText(amount || 0)
             this.payload = bin2hex(payload || '')
             this.to = bin2hex(to || '')
             this.signature = bin2hex(signature || '')
+        }
+
+        static from(o) {
+            return new Transaction(o.version, o.type, o.createdAt, o.nonce, o.from, o.gasLimit, o.gasPrice, o.amount, o.payload, o.to, o.signature)
+        }
+
+        /**
+         * 计算事务哈希值
+         * @returns { string } 哈希值
+         */
+        getHash() {
+            const buf = this.getSignaturePlain()
+            return sm3(buf)
+        }
+
+        /**
+         * 获得事务签名原文
+         * @returns { Uint8Array }
+         */
+        getSignaturePlain() {
+            const arr = [
+                convert(this.version || 0, ABI_DATA_TYPE.U64),
+                convert(this.type || 0, ABI_DATA_TYPE.U64),
+                convert(this.createdAt || '0', ABI_DATA_TYPE.U64),
+                convert(this.nonce || '0', ABI_DATA_TYPE.U64),
+                convert(this.from || EMPTY_BYTES, ABI_DATA_TYPE.BYTES),
+                convert(this.gasLimit || '0', ABI_DATA_TYPE.U64),
+                convert(this.gasPrice || '0', ABI_DATA_TYPE.U256),
+                convert(this.amount || '0', ABI_DATA_TYPE.U256),
+                convert(this.payload || EMPTY_BYTES, ABI_DATA_TYPE.BYTES),
+                convert(this.to || EMPTY_BYTES, ABI_DATA_TYPE.ADDRESS)
+            ]
+            return RLP.encode(arr)
         }
     }
 
     /**
      *
-     * @param s
+     * @param { Any } s
      * @returns {boolean}
      */
     function isBytes(s) {
@@ -490,7 +557,7 @@
                 return RLP.encodeBytes(numberToByteArray(o))
             }
             if (o instanceof BN)
-                return RLP.encodeBytes(o.toBuffer())
+                return RLP.encodeBytes(trimLeadingZeros(o.toBuffer()))
             if (o instanceof Uint8Array)
                 return RLP.encodeBytes(o)
             if (Array.isArray(o)) {
@@ -706,7 +773,7 @@
          *
          * @param {string} address 合约地址
          * @param { Array<ABI> } abi 合约的 abi
-         * @param {Uint8Array} binary 合约字节码
+         * @param {Uint8Array} [binary] 合约字节码
          */
         constructor(address, abi, binary) {
             this.address = address
@@ -796,7 +863,7 @@
     class RPC {
 
         /**
-         * 
+         *
          * @param {string} host  主机名
          * @param {string | number} port  端口号
          */
@@ -934,16 +1001,18 @@
          *
          * @param {number | string} version  事务版本号
          * @param {string | Uint8Array} sk  私钥
-         * @param {number | undefined} gasPrice  油价，油价 * 油 = 手续费
-         * @param { number | string | BN } nonce 起始 nonce
+         * @param {string | number | BN } [ gasLimit ]
+         * @param {number | undefined} [ gasPrice ]  油价，油价 * 油 = 手续费
+         * @param { number | string | BN } [ nonce ] 起始 nonce
          */
-        constructor(version, sk, gasPrice, nonce) {
+        constructor(version, sk, gasLimit, gasPrice, nonce) {
             this.version = version
             this.sk = sk
             this.gasPrice = gasPrice || 0
             if (nonce) {
                 nonce = typeof nonce === 'string' ? nonce : nonce.toString(10)
             }
+            this.gasLimit = gasLimit || 0
             this.nonce = nonce || 0
         }
 
@@ -964,9 +1033,9 @@
 
         /**
          * 构造部署合约的事务 （未签名）
-         * @param contract { Contract } 合约对象
-         * @param parameters { Array | Object } 合约的构造器参数
-         * @param amount {number}
+         * @param { Contract } contract 合约对象
+         * @param { Array | Object } [parameters] 合约的构造器参数
+         * @param amount [number]
          * @returns { Transaction }
          */
         buildDeploy(contract, parameters, amount) {
@@ -1000,10 +1069,10 @@
 
         /**
          * 构造合约调用事务
-         * @param contract { Contract} 合约
-         * @param method {string} 调用合约的方法
-         * @param parameters { Array | Object } 方法参数
-         * @param amount {number} 金额
+         * @param { Contract} contract 合约
+         * @param {string} method 调用合约的方法
+         * @param { Array | Object } [parameters] 方法参数
+         * @param amount [number] 金额
          * @returns { Transaction }
          */
         buildContractCall(contract, method, parameters, amount) {
@@ -1043,6 +1112,7 @@
                 Math.floor((new Date()).valueOf() / 1000),
                 0,
                 privateKey2PublicKey(this.sk),
+                this.gasLimit,
                 this.gasPrice,
                 amount || 0,
                 payload || '',
@@ -1050,10 +1120,11 @@
             )
 
             if (this.nonce) {
-                ret.nonce = typeof this.nonce == 'string' ? this.nonce : this.nonce.toString(10)
+                ret.nonce = asDigitalNumberText(this.nonce)
                 this.increaseNonce()
                 this.sign(ret)
             }
+
             return ret
         }
 
@@ -1186,10 +1257,9 @@
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState === 4) {
                         const resp = JSON.parse(xhr.responseText);
-                        if (resp.code === 200){
+                        if (resp.code === 200) {
                             resolve(resp.data)
-                        }
-                        else {
+                        } else {
                             reject(resp.message)
                         }
                     }
@@ -1315,11 +1385,11 @@
      * @param host {string} 节点主机名
      * @param port {string | number} 节点端口
      * @param hash 事务哈希值
-     * @returns {Promise<Object>}
+     * @returns {Promise<Transaction>}
      */
     function getTransaction(host, port, hash) {
         const url = `http://${host}:${port}/rpc/transaction/${hash}`
-        return rpcGet(url)
+        return rpcGet(url).then(Transaction.from)
     }
 
     /**
@@ -1339,7 +1409,7 @@
      * @param host {string} 节点主机名
      * @param port {string | Number} 节点端口
      * @param pkOrAddress {string} 公钥或者地址
-     * @returns {Promise<Number>}
+     * @returns {Promise<string>}
      */
     function getNonce(host, port, pkOrAddress) {
         return getAccount(host, port, pkOrAddress)
@@ -1349,7 +1419,7 @@
     /**
      * 生成合约地址
      * @param address {string | Uint8Array} 合约创建者的地址
-     * @param nonce {number} 事务的 nonce
+     * @param nonce {string | number | BN} 事务的 nonce
      * @returns {string} 合约的地址
      */
     function getContractAddress(address, nonce) {
@@ -1360,36 +1430,6 @@
         let buf = RLP.encode([address, convert(nonce, ABI_DATA_TYPE.U64)])
         buf = decodeHex(sm3(buf), 'hex')
         return encodeHex(buf.slice(buf.length - 20, buf.length))
-    }
-
-    /**
-     * 获得事务签名原文
-     * @param { Transaction } tx 事务
-     * @returns {Buffer}
-     */
-    function getSignaturePlain(tx) {
-        const arr = [
-            convert(tx.version || 0, ABI_DATA_TYPE.U64),
-            convert(tx.type || 0, ABI_DATA_TYPE.U64),
-            convert(tx.createdAt || '0', ABI_DATA_TYPE.U64),
-            convert(tx.nonce || '0', ABI_DATA_TYPE.U64),
-            convert(tx.from || EMPTY_BYTES, ABI_DATA_TYPE.BYTES),
-            convert(tx.gasPrice || '0', ABI_DATA_TYPE.U256),
-            convert(tx.amount || '0', ABI_DATA_TYPE.U256),
-            convert(tx.payload || '0', ABI_DATA_TYPE.BYTES),
-            convert(tx.to || EMPTY_BYTES, ABI_DATA_TYPE.ADDRESS)
-        ]
-        return RLP.encode(arr)
-    }
-
-    /**
-     * 获取事务哈希值
-     * @param { Transaction }tx 事务
-     * @returns { string }
-     */
-    function getTransactionHash(tx) {
-        const buf = getSignaturePlain(tx)
-        return sm3(buf)
     }
 
     /**
@@ -1404,12 +1444,15 @@
 
     /**
      * 公钥转地址
-     * @param pk {string | Buffer} 公钥
+     * @param pk {string | Uint8Array | ArrayBuffer} 公钥
      * @returns {string}
      */
     function publicKey2Address(pk) {
+        if (isBytes(pk))
+            pk = toU8Arr(pk)
         if (typeof pk === 'string')
             pk = decodeHex(pk)
+
         const buf = decodeHex(sm3(pk))
         return encodeHex(buf.slice(buf.length - 20, buf.length))
     }
@@ -1422,7 +1465,7 @@
     function sign(tx, sk) {
         tx.signature =
             sm2.doSignature(
-                getSignaturePlain(tx),
+                tx.getSignaturePlain(),
                 sk,
                 { userId: 'userid@soie-chain.com', der: false, hash: true }
             )
@@ -1452,8 +1495,6 @@
     }
 
     const tool = {
-        getSignaturePlain: getSignaturePlain,
-        getTransactionHash: getTransactionHash,
         sign: sign,
         publicKey2Address: publicKey2Address,
         privateKey2PublicKey: privateKey2PublicKey,
