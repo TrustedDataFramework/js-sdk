@@ -556,8 +556,9 @@
                 assert(o >= 0 && Number.isInteger(o), `${o} is not a valid integer`)
                 return RLP.encodeBytes(numberToByteArray(o))
             }
-            if (o instanceof BN)
-                return RLP.encodeBytes(trimLeadingZeros(o.toBuffer()))
+            if (o instanceof BN){
+                return RLP.encodeBytes(trimLeadingZeros(o.toArrayLike(Uint8Array,'be')))
+            }
             if (o instanceof Uint8Array)
                 return RLP.encodeBytes(o)
             if (Array.isArray(o)) {
@@ -944,7 +945,7 @@
         /**
          * 获取 nonce
          * @param pkOrAddress {string} 公钥或者地址
-         * @returns {Promise<Number>}
+         * @returns {Promise<string>}
          */
         getNonce(pkOrAddress) {
             return this.getAccount(pkOrAddress)
@@ -1088,7 +1089,7 @@
             if (!parameters)
                 parameters = []
 
-            if (parameters instanceof Buffer || typeof parameters === 'string')
+            if (parameters instanceof Uint8Array || typeof parameters === 'string')
                 throw new Error('parameters should be an raw js object or array')
 
             const addr = contract.address
@@ -1309,7 +1310,6 @@
         } else {
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.setRequestHeader('Content-Type', 'application/json')
 
                 xhr.onload = function () {
                     if (xhr.status !== 200) {
@@ -1324,6 +1324,7 @@
                     }
                 }
                 xhr.open('POST', `http://${host}:${port}${path}`);
+                xhr.setRequestHeader('Content-Type', 'application/json')
                 xhr.send(data)
             })
         }
