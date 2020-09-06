@@ -896,9 +896,13 @@
             this._eventHandlers = new Map() // address:event -> [id]
             this._tx_observers = new Map() // hash -> [id]
             this._cid = 0
+        }
 
+        _tryConnect() {
+            if(this._ws)
+                return
             const WS = isBrowser ? WebSocket : require('ws')
-            this._ws = new WS(`ws://${host}:${port || 80}/websocket`)
+            this._ws = new WS(`ws://${this.host}:${this.port || 80}/websocket`)
             this._ws.onmessage = (e) => {
                 if (!isBrowser) {
                     this._handleData(e.data)
@@ -912,7 +916,6 @@
                 };
                 reader.readAsArrayBuffer(e.data)
             }
-
         }
 
         _handleData(data) {
@@ -955,6 +958,7 @@
          * @returns {number} 监听器的 id
          */
         listen(contract, event, func) {
+            this._tryConnect()
             const id = ++this._cid
             const key = `${contract.address}:${event}`
             this._id2key.set(id, key)
@@ -993,6 +997,7 @@
         }
 
         listenOnce(contract, event, func) {
+            this._tryConnect()
             const id = this._cid + 1
             this.listen(contract, event, (addr, e, p) => {
                 func(addr, e, p)
@@ -1007,6 +1012,7 @@
          * @returns {number}
          */
         observe(hash, cb){
+            this._tryConnect()
             const id = ++this._cid
             if(isBytes(hash))
                 hash = encodeHex(hash)
@@ -1062,6 +1068,34 @@
          */
         sendTransaction(tx) {
             return sendTransaction(this.host, this.port, tx)
+        }
+
+
+        /**
+         * 发送事务的同时监听事务的状态
+         * @param { Transaction } tx 
+         */
+        sendAndObserve(tx, timeout){
+            this.sendTransaction(tx)
+            return new Promise((resolve, reject) => {
+                let success = false
+
+                if(timeout)
+                    setTimeout(() => {
+                        if(success) return
+                        reject(`timeout for tx ${tx.getHash()}`)
+                    }, timeout
+                )
+
+                this.observe(tx.getHash(), (h, s, d) => {
+                    if(s === TX_STATUS.DROPPED)
+                        reject(`${h} dropped, reason = ${d}`)
+                    if(s === TX_STATUS.CONFIRMED){
+                        success = true
+                        resolve(h)
+                    }
+                })
+            })
         }
 
         /**
