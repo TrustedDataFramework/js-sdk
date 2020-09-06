@@ -930,7 +930,7 @@
                         d = bin2str(decoded[3])
                     if(s === TX_STATUS.INCLUDED)
                         d = encodeHex(decoded[3])   
-                    const funcIds = this._tx_observers.get(h)
+                    const funcIds = this._tx_observers.get(h) || []
                     for (const funcId of funcIds) {
                         const func = this._callbacks.get(funcId)
                         func(h, s, d)
@@ -1070,32 +1070,46 @@
             return sendTransaction(this.host, this.port, tx)
         }
 
-
-        /**
-         * 发送事务的同时监听事务的状态
-         * @param { Transaction } tx 
-         */
-        sendAndObserve(tx, timeout){
-            this.sendTransaction(tx)
+        _observeTx(tx, timeout){
             return new Promise((resolve, reject) => {
                 let success = false
 
                 if(timeout)
                     setTimeout(() => {
                         if(success) return
-                        reject(`timeout for tx ${tx.getHash()}`)
+                        reject({transaction: tx, reason: 'timeout'})
                     }, timeout
                 )
 
                 this.observe(tx.getHash(), (h, s, d) => {
                     if(s === TX_STATUS.DROPPED)
-                        reject(`${h} dropped, reason = ${d}`)
+                        reject({transaction: tx, reason: d})
                     if(s === TX_STATUS.CONFIRMED){
                         success = true
-                        resolve(h)
+                        resolve(tx)
                     }
                 })
             })
+        }
+
+        /**
+         * 发送事务的同时监听事务的状态
+         * @param { Transaction | Array<Transaction> } tx 
+         * @returns { Promise<Transaction> } 
+         */
+        sendAndObserve(tx, timeout){
+            let ret
+            if(Array.isArray(tx)){
+                const arr = []
+                for(const t of tx){
+                    arr.push(this._observeTx(t, timeout))
+                }
+                ret = Promise.all(arr)
+            } else{
+                ret = this._observeTx(tx, timeout)
+            }
+            this.sendTransaction(tx)
+            return ret
         }
 
         /**
