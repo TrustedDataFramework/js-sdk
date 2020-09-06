@@ -26,6 +26,12 @@
     const http = isBrowser ? null : require('http')
     const child_process = isBrowser ? null : require('child_process');
 
+    const TX_STATUS = {
+        PENDING: 0,
+        INCLUDED: 1,
+        CONFIRMED: 2,
+        DROPPED: 3
+    }
 
     /**
      * 随机生成 Uint8Array
@@ -819,7 +825,7 @@
          *
          * @param name {string} 方法名称
          * @param buf {Uint8Array | string}
-         * @returns { Array } rlp 解码后的参数列表
+         * @returns { Array | Object } rlp 解码后的参数列表
          * @param {string} [type] 类型
          */
         abiDecode(name, buf, type) {
@@ -833,30 +839,40 @@
 
             const func = this.abi.filter(x => x.type === type && x.name === name)[0]
             const arr = RLP.decode(buf)
-            const ret = []
+
+            const returnObject = func.outputs.every(v => v.name) && (
+                (new Set(func.outputs.map(v => v.name))).size === func.outputs.length
+            )
+            const ret = returnObject ? {} : []
             for (let i = 0; i < arr.length; i++) {
                 const t = func.outputs[i].type
+                const name = func.outputs[i].name
+                let val
                 switch (t) {
                     case ABI_DATA_TYPE.BYTES:
                     case ABI_DATA_TYPE.ADDRESS: {
-                        ret[i] = encodeHex(arr[i])
+                        val = encodeHex(arr[i])
                         break
                     }
                     case ABI_DATA_TYPE.U256:
                     case ABI_DATA_TYPE.U64: {
-                        ret[i] = new BN(arr[i], 'be')
+                        val = new BN(arr[i], 'be')
                         if (t === ABI_DATA_TYPE.U64)
-                            assert(ret[i].cmp(MAX_U64) <= 0, `${ret.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
+                            assert(val.cmp(MAX_U64) <= 0, `${val.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
                         if (t === ABI_DATA_TYPE.U256)
-                            assert(ret[i].cmp(MAX_U256) <= 0, `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
-                        ret[i] = ret[i].toString(10)
+                            assert(val.cmp(MAX_U256) <= 0, `${val.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
+                        val = val.toString(10)
                         break
                     }
                     case ABI_DATA_TYPE.STRING: {
-                        ret[i] = bin2str(arr[i])
+                        val = bin2str(arr[i])
                         break
                     }
                 }
+                if(returnObject)
+                    ret[name] = val
+                else
+                    ret[i] = val    
             }
             return ret
         }
@@ -876,42 +892,58 @@
 
             this._callbacks = new Map() // id -> function
             this._id2key = new Map()// id -> address:event
+            this._id2hash = new Map()  // id -> txhash
             this._eventHandlers = new Map() // address:event -> [id]
-            this._tx_observers = new Map() // 
-            this._ws = new WebSocket(`ws://${host}:${port || 80}/websocket`)
+            this._tx_observers = new Map() // hash -> [id]
             this._cid = 0
-            const _this = this
-            this._ws.onmessage = function (event) {
 
+            const WS = isBrowser ? WebSocket : require('ws')
+            this._ws = new WS(`ws://${host}:${port || 80}/websocket`)
+            this._ws.onmessage = (e) => {
+                if (!isBrowser) {
+                    this._handleData(e.data)
+                    return
+                }
                 const reader = new FileReader();
 
                 reader.onload = () => {
                     var arrayBuffer = reader.result
-                    const data = new Uint8Array(arrayBuffer);
-                    const decoded = RLP.decode(data)
-                    const i = new BN(decoded[0], 'be')
-                    switch (i.toString(10)) {
-                        case '0': {
-                            break
-                        }
-                        case '1': {
-                            const addr = encodeHex(decoded[1])
-                            const event = bin2str(decoded[2])
-                            const funcIds = _this._eventHandlers.get(`${addr}:${event}`) || []
-                            for (const funcId of funcIds) {
-                                const func = _this._callbacks.get(funcId)
-                                func(addr, event, decoded[3])
-                            }
-                            break
-                        }
-                    }
+                    this._handleData(new Uint8Array(arrayBuffer))
                 };
-
-                reader.readAsArrayBuffer(event.data)
+                reader.readAsArrayBuffer(e.data)
             }
 
-            this._ws.onopen = function () {
-                console.log('open')
+        }
+
+        _handleData(data) {
+            const decoded = RLP.decode(data)
+            const i = new BN(decoded[0], 'be')
+            switch (i.toString(10)) {
+                case '0': {
+                    const h = encodeHex(decoded[1])
+                    const s = (new BN(decoded[2], 'be')).toNumber()
+                    let d = null
+                    if(s === TX_STATUS.DROPPED)
+                        d = bin2str(decoded[3])
+                    if(s === TX_STATUS.INCLUDED)
+                        d = encodeHex(decoded[3])   
+                    const funcIds = this._tx_observers.get(h)
+                    for (const funcId of funcIds) {
+                        const func = this._callbacks.get(funcId)
+                        func(h, s, d)
+                    }
+                    break
+                }
+                case '1': {
+                    const addr = encodeHex(decoded[1])
+                    const event = bin2str(decoded[2])
+                    const funcIds = this._eventHandlers.get(`${addr}:${event}`) || []
+                    for (const funcId of funcIds) {
+                        const func = this._callbacks.get(funcId)
+                        func(addr, event, decoded[3])
+                    }
+                    break
+                }
             }
         }
 
@@ -919,13 +951,13 @@
          * 监听合约事件
          * @param {Contract} contract 合约
          * @param {string} event 事件
-         * @param {function} func 合约事件回调 (address, event, parameters)
+         * @param {Function} func 合约事件回调 (address, event, parameters)
          * @returns {number} 监听器的 id
          */
         listen(contract, event, func) {
-            const id = ++this.cid
+            const id = ++this._cid
             const key = `${contract.address}:${event}`
-            this._id2key = key
+            this._id2key.set(id, key)
             const fn = (addr, event, parameters) => {
                 const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
                 func(addr, event, abiDecoded)
@@ -946,21 +978,58 @@
          */
         removeListener(id) {
             const key = this._id2key.get(id)
+            const h = this._id2hash.get(id)
             this._callbacks.delete(id)
             this._id2key.delete(id)
+            this._id2hash.delete(id)
             if (key) {
                 const set = this._eventHandlers.get(key)
+                set && set.delete(id)
+            }
+            if(h){
+                const set = this._tx_observers.get(h)
                 set && set.delete(id)
             }
         }
 
         listenOnce(contract, event, func) {
-            const id = this.cid + 1
+            const id = this._cid + 1
             this.listen(contract, event, (addr, e, p) => {
                 func(addr, e, p)
                 this.removeListener(id)
             })
         }
+
+        /**
+         * 添加事务观察者，如果事务最终被确认或者异常终止，观察者会被移除
+         * @param {string | Uint8Array | ArrayBuffer} hash 
+         * @param { Function } cb  (hash, status, msg)
+         * @returns {number}
+         */
+        observe(hash, cb){
+            const id = ++this._cid
+            if(isBytes(hash))
+                hash = encodeHex(hash)
+
+            hash = hash.toLowerCase()
+            if(!this._tx_observers.has(hash))
+                this._tx_observers.set(hash, new Set())
+            this._id2hash.set(id, hash)
+            this._tx_observers.get(hash).add(id)
+
+            const fn = (h, s, d) => {
+                cb(h, s, d)
+                switch (s){
+                    case TX_STATUS.DROPPED:
+                    case TX_STATUS.CONFIRMED:
+                        this.removeListener(id)   
+                        break 
+                }
+            } 
+            this._callbacks.set(id, fn)
+            return id
+        }
+
 
         /**
          * 查看合约方法
@@ -1601,7 +1670,8 @@
         Transaction: Transaction,
         randomBytes: randomBytes,
         encodeHex: encodeHex,
-        decodeHex: decodeHex
+        decodeHex: decodeHex,
+        TX_STATUS: TX_STATUS
     }
 
     if (!isBrowser)
