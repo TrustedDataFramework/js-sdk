@@ -556,8 +556,8 @@
                 assert(o >= 0 && Number.isInteger(o), `${o} is not a valid integer`)
                 return RLP.encodeBytes(numberToByteArray(o))
             }
-            if (o instanceof BN){
-                return RLP.encodeBytes(trimLeadingZeros(o.toArrayLike(Uint8Array,'be')))
+            if (o instanceof BN) {
+                return RLP.encodeBytes(trimLeadingZeros(o.toArrayLike(Uint8Array, 'be')))
             }
             if (o instanceof Uint8Array)
                 return RLP.encodeBytes(o)
@@ -820,8 +820,10 @@
          * @param name {string} 方法名称
          * @param buf {Uint8Array | string}
          * @returns { Array } rlp 解码后的参数列表
+         * @param {string} [type] 类型
          */
-        abiDecode(name, buf) {
+        abiDecode(name, buf, type) {
+            type = type || ABI_TYPE.FUNCTION
             if (!buf)
                 buf = ''
             if (typeof buf === 'string')
@@ -829,7 +831,7 @@
             if (buf.length === 0)
                 return []
 
-            const func = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)[0]
+            const func = this.abi.filter(x => x.type === type && x.name === name)[0]
             const arr = RLP.decode(buf)
             const ret = []
             for (let i = 0; i < arr.length; i++) {
@@ -871,6 +873,93 @@
         constructor(host, port) {
             this.host = host || 'localhost'
             this.port = port || 80
+
+            this._callbacks = new Map() // id -> function
+            this._id2key = new Map()// id -> address:event
+            this._eventHandlers = new Map() // address:event -> [id]
+            this._tx_observers = new Map() // 
+            this._ws = new WebSocket(`ws://${host}:${port || 80}/websocket`)
+            this._cid = 0
+            const _this = this
+            this._ws.onmessage = function (event) {
+
+                const reader = new FileReader();
+
+                reader.onload = () => {
+                    var arrayBuffer = reader.result
+                    const data = new Uint8Array(arrayBuffer);
+                    const decoded = RLP.decode(data)
+                    const i = new BN(decoded[0], 'be')
+                    switch (i.toString(10)) {
+                        case '0': {
+                            break
+                        }
+                        case '1': {
+                            const addr = encodeHex(decoded[1])
+                            const event = bin2str(decoded[2])
+                            const funcIds = _this._eventHandlers.get(`${addr}:${event}`) || []
+                            for (const funcId of funcIds) {
+                                const func = _this._callbacks.get(funcId)
+                                func(addr, event, decoded[3])
+                            }
+                            break
+                        }
+                    }
+                };
+
+                reader.readAsArrayBuffer(event.data)
+            }
+
+            this._ws.onopen = function () {
+                console.log('open')
+            }
+        }
+
+        /**
+         * 监听合约事件
+         * @param {Contract} contract 合约
+         * @param {string} event 事件
+         * @param {function} func 合约事件回调 (address, event, parameters)
+         * @returns {number} 监听器的 id
+         */
+        listen(contract, event, func) {
+            const id = ++this.cid
+            const key = `${contract.address}:${event}`
+            this._id2key = key
+            const fn = (addr, event, parameters) => {
+                const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
+                func(addr, event, abiDecoded)
+            }
+            if (!this._eventHandlers.has(key))
+                this._eventHandlers.set(key, new Set())
+
+            this._eventHandlers.get(key).add(id)
+            this._callbacks.set(id, fn)
+
+            return id
+        }
+
+
+        /**
+         * 移除监听器
+         * @param {number} id 监听器的 id
+         */
+        removeListener(id) {
+            const key = this._id2key.get(id)
+            this._callbacks.delete(id)
+            this._id2key.delete(id)
+            if (key) {
+                const set = this._eventHandlers.get(key)
+                set && set.delete(id)
+            }
+        }
+
+        listenOnce(contract, event, func) {
+            const id = this.cid + 1
+            this.listen(contract, event, (addr, e, p) => {
+                func(addr, e, p)
+                this.removeListener(id)
+            })
         }
 
         /**
@@ -1535,21 +1624,22 @@
         const key = sm3(buf)
         const cipherPrivKey = decodeHex(ks.crypto.cipherText)
 
-        return encodeHex(
-            sm4.decrypt(cipherPrivKey, decodeHex(key))
-        )
+        const decrypted = new Uint8Array(sm4.decrypt(cipherPrivKey, decodeHex(key)))
+        return encodeHex(decrypted)
     }
 
 
     /**
      * 生成 keystore
      * @param {string } password 密码
-     * @param {string | Uint8Array | undefined} privateKey
+     * @param {string | Uint8Array | ArrayBuffer} [privateKey]
      * @return {Object} 生成好的 keystore
      */
     function createKeyStore(password, privateKey) {
         if (!privateKey)
             privateKey = generatePrivateKey()
+        if (isBytes(privateKey))
+            privateKey = toU8Arr(privateKey)
 
         if (typeof privateKey === 'string') {
             privateKey = decodeHex(privateKey)
