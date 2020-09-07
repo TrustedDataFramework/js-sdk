@@ -326,10 +326,11 @@
 
     /**
      * decode binary as utf8 string
-     * @param { Uint8Array } bin
+     * @param { Uint8Array | ArrayBuffer } bin
      * @returns {string} decoded result
      */
     function bin2str(bin) {
+        bin = toU8Arr(bin)
         if (isBrowser)
             return new TextDecoder().decode(bin)
         return Buffer.from(bin).toString('utf8')
@@ -1733,7 +1734,10 @@
         randomBytes: randomBytes,
         encodeHex: encodeHex,
         decodeHex: decodeHex,
-        TX_STATUS: TX_STATUS
+        TX_STATUS: TX_STATUS,
+        RLP, RLP,
+        str2bin: str2bin,
+        bin2str: bin2str
     }
 
     if (!isBrowser)
