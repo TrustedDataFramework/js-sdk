@@ -869,10 +869,10 @@
                         break
                     }
                 }
-                if(returnObject)
+                if (returnObject)
                     ret[name] = val
                 else
-                    ret[i] = val    
+                    ret[i] = val
             }
             return ret
         }
@@ -899,7 +899,7 @@
         }
 
         _tryConnect() {
-            if(this._ws)
+            if (this._ws)
                 return
             const WS = isBrowser ? WebSocket : require('ws')
             this._ws = new WS(`ws://${this.host}:${this.port || 80}/websocket`)
@@ -926,10 +926,10 @@
                     const h = encodeHex(decoded[1])
                     const s = (new BN(decoded[2], 'be')).toNumber()
                     let d = null
-                    if(s === TX_STATUS.DROPPED)
+                    if (s === TX_STATUS.DROPPED)
                         d = bin2str(decoded[3])
-                    if(s === TX_STATUS.INCLUDED)
-                        d = encodeHex(decoded[3])   
+                    if (s === TX_STATUS.INCLUDED)
+                        d = encodeHex(decoded[3])
                     const funcIds = this._tx_observers.get(h) || []
                     for (const funcId of funcIds) {
                         const func = this._callbacks.get(funcId)
@@ -990,7 +990,7 @@
                 const set = this._eventHandlers.get(key)
                 set && set.delete(id)
             }
-            if(h){
+            if (h) {
                 const set = this._tx_observers.get(h)
                 set && set.delete(id)
             }
@@ -1011,27 +1011,27 @@
          * @param { Function } cb  (hash, status, msg)
          * @returns {number}
          */
-        observe(hash, cb){
+        observe(hash, cb) {
             this._tryConnect()
             const id = ++this._cid
-            if(isBytes(hash))
+            if (isBytes(hash))
                 hash = encodeHex(hash)
 
             hash = hash.toLowerCase()
-            if(!this._tx_observers.has(hash))
+            if (!this._tx_observers.has(hash))
                 this._tx_observers.set(hash, new Set())
             this._id2hash.set(id, hash)
             this._tx_observers.get(hash).add(id)
 
             const fn = (h, s, d) => {
                 cb(h, s, d)
-                switch (s){
+                switch (s) {
                     case TX_STATUS.DROPPED:
                     case TX_STATUS.CONFIRMED:
-                        this.removeListener(id)   
-                        break 
+                        this.removeListener(id)
+                        break
                 }
-            } 
+            }
             this._callbacks.set(id, fn)
             return id
         }
@@ -1070,21 +1070,21 @@
             return sendTransaction(this.host, this.port, tx)
         }
 
-        _observeTx(tx, timeout){
+        _observeTx(tx, timeout) {
             return new Promise((resolve, reject) => {
                 let success = false
 
-                if(timeout)
+                if (timeout)
                     setTimeout(() => {
-                        if(success) return
-                        reject({transaction: tx, reason: 'timeout'})
+                        if (success) return
+                        reject({ transaction: tx, reason: 'timeout' })
                     }, timeout
-                )
+                    )
 
                 this.observe(tx.getHash(), (h, s, d) => {
-                    if(s === TX_STATUS.DROPPED)
-                        reject({transaction: tx, reason: d})
-                    if(s === TX_STATUS.CONFIRMED){
+                    if (s === TX_STATUS.DROPPED)
+                        reject({ transaction: tx, reason: d })
+                    if (s === TX_STATUS.CONFIRMED) {
                         success = true
                         resolve(tx)
                     }
@@ -1097,15 +1097,15 @@
          * @param { Transaction | Array<Transaction> } tx 
          * @returns { Promise<Transaction> } 
          */
-        sendAndObserve(tx, timeout){
+        sendAndObserve(tx, timeout) {
             let ret
-            if(Array.isArray(tx)){
+            if (Array.isArray(tx)) {
                 const arr = []
-                for(const t of tx){
+                for (const t of tx) {
                     arr.push(this._observeTx(t, timeout))
                 }
                 ret = Promise.all(arr)
-            } else{
+            } else {
                 ret = this._observeTx(tx, timeout)
             }
             this.sendTransaction(tx)
@@ -1200,6 +1200,14 @@
                 method: 'voteInfo',
                 txHash: txHash
             })
+        }
+
+        close() {
+            if (this._ws) {
+                const _ws = this._ws
+                this._ws = null
+                _ws.close()
+            }
         }
     }
 
@@ -1412,18 +1420,24 @@
         POS_CONTRACT_ADDR: "0000000000000000000000000000000000000005"
     }
 
+
     /**
      * 编译合约
      * @param ascPath {string} 编译器路径，一般在 node_modules/.bin/asc 下面
      * @param src {string} 源文件路径
-     * @returns {Promise<Buffer>}
+     * @returns {Promise<Uint8Array>}
      */
-    function compileContract(ascPath, src) {
+    function compileContract(ascPath, src, opts) {
+        let cmd = ascPath + ' ' + src + ' -b ' // 执行的命令
+        if (opts && opts.debug)
+            cmd += ' --debug '
+        if (opts && opts.optimize)
+            cmd += ' --optimize '
         if (isBrowser)
             throw new Error('compile contract is available in node environment')
         return new Promise((resolve, reject) => {
             child_process.exec(
-                ascPath + ' ' + src + ' --optimize -b', // 执行的命令
+                cmd,
                 { encoding: 'buffer' },
                 (err, stdout, stderr) => {
                     if (err) {
@@ -1815,12 +1829,14 @@
     }
 
     /**
-     *
-     * @param whiteList {Array<string> | undefined } 公钥白名单
-     * @param privateKey {string | Buffer} 私钥
+     * 认证服务器
+     * @param whiteList { Array<string> | undefined } 公钥白名单
+     * @param privateKey {string | Uint8Array | ArrayBuffer } 私钥
      * @returns {Object}
      */
     function createAuthServer(privateKey, whiteList) {
+        if (isBrowser)
+            throw new Error('create auth server is available in nodejs')
         const URL = require('url');
         const http = require('http')
         const server = http.createServer()
