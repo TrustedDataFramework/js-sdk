@@ -673,7 +673,8 @@
         STRING: 'string', // string
         ADDRESS: 'address', //
         BYTES: 'bytes',
-        U256: 'u256'
+        U256: 'u256',
+        BOOL: 'bool'
     }
 
     const ABI_TYPE = {
@@ -692,9 +693,10 @@
             o = toU8Arr(o)
         if (o instanceof Uint8Array) {
             switch (type) {
+                case ABI_DATA_TYPE.BOOL:
                 case ABI_DATA_TYPE.U256:
                 case ABI_DATA_TYPE.U64: {
-                    throw new Error('cannot convert uint8array to u64 or u256')
+                    throw new Error('cannot convert uint8array to u64, u256 or bool')
                 }
                 case ABI_DATA_TYPE.STRING: {
                     throw new Error('cannot convert uint8array to string')
@@ -726,6 +728,19 @@
                 case ABI_DATA_TYPE.STRING: {
                     return o
                 }
+                case ABI_DATA_TYPE.BOOL: {
+                    let l = o.toLowerCase()
+                    if ('true' === l)
+                        return 1
+                    if ('false' === l)
+                        return 0
+                    if (isNaN(o))
+                        throw new Error(`cannot convert ${o} to bool`)
+                    l = parseInt(o)
+                    if (1 === l || 0 === l)
+                        return l
+                    throw new Error(`convert ${l} to bool failed, provide 1 or 0`)
+                }
                 case ABI_DATA_TYPE.BYTES:
                 case ABI_DATA_TYPE.ADDRESS: {
                     if (o.substr(0, 2) === '0x') {
@@ -748,6 +763,11 @@
                 case ABI_DATA_TYPE.STRING: {
                     return o.toString(10)
                 }
+                case ABI_DATA_TYPE.BOOL: {
+                    if (1 === o || 0 === o)
+                        return o
+                    throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
+                }
                 case ABI_DATA_TYPE.BYTES:
                 case ABI_DATA_TYPE.ADDRESS: {
                     throw new Error("cannot convert number to address or bytes")
@@ -768,6 +788,31 @@
                 case ABI_DATA_TYPE.BYTES:
                 case ABI_DATA_TYPE.ADDRESS: {
                     throw new Error("cannot convert big number to address or bytes")
+                }
+                case ABI_DATA_TYPE.BOOL: {
+                    if (o.cmp(1) === 0 || o.cmp(1) === 0)
+                        return o
+                    throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
+                }
+            }
+            throw new Error("unexpected abi type " + type)
+        }
+
+        if (typeof o === 'boolean') {
+            switch (type) {
+                case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.U64: {
+                    return o ? 1 : 0;
+                }
+                case ABI_DATA_TYPE.STRING: {
+                    return o.toString()
+                }
+                case ABI_DATA_TYPE.BYTES:
+                case ABI_DATA_TYPE.ADDRESS: {
+                    throw new Error("cannot convert boolean to address or bytes")
+                }
+                case ABI_DATA_TYPE.BOOL: {
+                    return o ? 1 : 0
                 }
             }
             throw new Error("unexpected abi type " + type)

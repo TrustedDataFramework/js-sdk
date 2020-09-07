@@ -234,7 +234,7 @@ rpc.getNonce(pk)
 ### 发送事务（异步）
 
 ```js
-const tx = {
+const tx = tool.Transaction.from({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,
@@ -244,7 +244,7 @@ const tx = {
     "amount" : 20,
     "payload" : "02b507fe1afd0cc7a525488292beadbe9f143784de44f8bc1c991636509fd50936",
     "to" : "9cbf30db111483e4b84e77ca0e39378fd7605e1b",
-}
+})
 
 rpc.sendTransaction(tx)
 .then(console.log)
