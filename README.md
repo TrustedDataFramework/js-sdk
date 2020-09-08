@@ -34,7 +34,7 @@ constants ==
 
 ```js
 const tool = require('@salaku/js-sdk')
-const tx = tool.Transaction.from({
+const tx = tool.Transaction.of({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,
@@ -56,7 +56,7 @@ console.log(tx.signature)
 
 ```js
 const tool = require('@salaku/js-sdk')
-const tx = tool.Transaction.from({
+const tx = tool.Transaction.of({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,
@@ -234,7 +234,7 @@ rpc.getNonce(pk)
 ### 发送事务（异步）
 
 ```js
-const tx = tool.Transaction.from({
+const tx = tool.Transaction.of({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,

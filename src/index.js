@@ -34,8 +34,8 @@
     }
 
     /**
-     * 随机生成 Uint8Array
-     * @param {number} length 长度
+     * 随机生成字节数组 Uint8Array
+     * @param {number} length 字节数组长度
      * @return {Uint8Array}
      */
     function randomBytes(length) {
@@ -56,7 +56,8 @@
     const MAX_U256 = new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16);
 
     /**
-     * @param { Uint8Array | ArrayBuffer }
+     * 截掉字节数组前面的 0
+     * @param { Uint8Array | ArrayBuffer } data 字节数组
      */
     function trimLeadingZeros(data) {
         assert(isBytes(data), 'data is not bytes')
@@ -97,7 +98,7 @@
     }
 
     /**
-     *
+     * 判断是否是合法的十六进制字符串，不以 0x 开头
      * @param {string} hex
      * @returns
      */
@@ -159,7 +160,8 @@
                 || type === ABI_DATA_TYPE.U64
                 || type === ABI_DATA_TYPE.ADDRESS
                 || type === ABI_DATA_TYPE.BYTES
-                || type === ABI_DATA_TYPE.U256,
+                || type === ABI_DATA_TYPE.U256
+                || type === ABI_DATA_TYPE.BOOL,
                 `invalid abi type def type = ${type}`
             )
             this.type = type
@@ -217,7 +219,7 @@
          * @param {string | Uint8Array | ArrayBuffer } [signature]
          */
         constructor(version, type, createdAt, nonce, from, gasLimit, gasPrice, amount, payload, to, signature) {
-            if (isNaN(createdAt)) {
+            if (typeof createdAt === 'string' && isNaN(createdAt)) {
                 try {
                     createdAt = (new Date(createdAt).valueOf()) / 1000
                 } catch (ignored) {
@@ -237,7 +239,7 @@
             this.signature = bin2hex(signature || '')
         }
 
-        static from(o) {
+        static of(o) {
             return new Transaction(o.version, o.type, o.createdAt, o.nonce, o.from, o.gasLimit, o.gasPrice, o.amount, o.payload, o.to, o.signature)
         }
 
@@ -273,7 +275,7 @@
 
     /**
      *
-     * @param { Any } s
+     * @param s
      * @returns {boolean}
      */
     function isBytes(s) {
@@ -282,18 +284,18 @@
 
     /**
      * convert uint8array or array buffer to uint8 array
-     * @param {Uint8Array | ArrayBuffer} x
+     * @param {Uint8Array | ArrayBuffer} data
      * @returns {Uint8Array}
      */
-    function toU8Arr(x) {
-        assert(isBytes(x), `${x} is not uint8array or arraybuffer`)
-        if (x instanceof ArrayBuffer)
-            return new Uint8Array(x)
-        return x
+    function toU8Arr(data) {
+        assert(isBytes(data), `${data} is not uint8array or arraybuffer`)
+        if (data instanceof ArrayBuffer)
+            return new Uint8Array(data)
+        return data
     }
 
     /**
-     *
+     * 字节数组转 number
      * @param {Uint8Array | ArrayBuffer} bytes
      * @returns {number}
      */
@@ -367,7 +369,7 @@
     }
 
     /**
-     *
+     * number 转字节数组
      * @param {number} u
      * @returns {Uint8Array}
      */
@@ -387,6 +389,18 @@
             }
         }
         return buf.slice(k, buf.length);
+    }
+
+    /**
+     * 
+     * @param {Uint8Array} arr 
+     */
+    function reverse(arr){
+        const ret = new Uint8Array(arr.length)
+        for(let i = 0; i < ret.length; i++){
+            ret[i] = arr.length - i
+        }
+        return ret
     }
 
     function isRLPList(encoded) {
@@ -501,10 +515,12 @@
         if (Array.isArray(x)) {
             assert(y === undefined, `concat bytes failed, y is not allowed here`)
             let ret = EMPTY_BYTES;
-            for (i of x)
-                ret = concatBytes(ret, i)
+            for (let el of x)
+                ret = concatBytes(ret, el)
             return ret
         }
+        if (!y)
+            return x
         x = toU8Arr(x)
         y = toU8Arr(y)
         const ret = new Uint8Array(x.length + y.length);
@@ -538,12 +554,22 @@
 
 
     class RLP {
-        // encode a string
+
+        /**
+         * rlp encode
+         * @param {string} s
+         * @return {Uint8Array}
+         */
         static encodeString(s) {
             return encodeBytes(str2bin(s))
         }
 
 
+        /**
+         * rlp encode
+         * @param {Uint8Array | ArrayBuffer} bytes
+         * @return {Uint8Array}
+         */
         static encodeBytes(bytes) {
             return encodeBytes(bytes);
         }
@@ -560,7 +586,7 @@
             if (typeof o === 'string')
                 return RLP.encodeString(o)
             if (typeof o === 'number') {
-                assert(o >= 0 && Number.isInteger(o), `${o} is not a valid integer`)
+                assert(o >= 0 && Number.isInteger(o), `${o} is not a valid non-negative integer`)
                 return RLP.encodeBytes(numberToByteArray(o))
             }
             if (o instanceof BN) {
@@ -669,12 +695,27 @@
     }
 
     const ABI_DATA_TYPE = {
-        U64: 'u64', // BN
-        STRING: 'string', // string
-        ADDRESS: 'address', //
-        BYTES: 'bytes',
-        U256: 'u256',
-        BOOL: 'bool'
+        BOOL: 'bool', // 0
+        I64: 'i64',  // 1
+        U64: 'u64', //  2 BN
+        F64: 'f64',
+        STRING: 'string', // 3 string
+        BYTES: 'bytes', // 4
+        ADDRESS: 'address', // 5
+        U256: 'u256', // 6
+        VOID: 'void'
+    }
+
+    const ABI_DATA_ENUM = {
+        'bool': 0, // 0
+        'i64': 1,  // 1
+        'u64': 2, //  2 BN
+        'f64': 3,
+        'string': 4, // 3 string
+        'bytes': 5, // 4
+        'address': 6, // 5
+        'u256': 7, // 6
+        'void': 8
     }
 
     const ABI_TYPE = {
@@ -695,7 +736,8 @@
             switch (type) {
                 case ABI_DATA_TYPE.BOOL:
                 case ABI_DATA_TYPE.U256:
-                case ABI_DATA_TYPE.U64: {
+                case ABI_DATA_TYPE.U64: 
+                case ABI_DATA_TYPE.F64: {
                     throw new Error('cannot convert uint8array to u64, u256 or bool')
                 }
                 case ABI_DATA_TYPE.STRING: {
@@ -724,6 +766,10 @@
                     if (type === ABI_DATA_TYPE.U256)
                         assert(ret.cmp(MAX_U256) <= 0, `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                     return ret
+                }
+                case ABI_DATA_TYPE.F64:{
+                    let f = parseFloat(o)
+                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(f).buffer)))
                 }
                 case ABI_DATA_TYPE.STRING: {
                     return o
@@ -772,6 +818,9 @@
                 case ABI_DATA_TYPE.ADDRESS: {
                     throw new Error("cannot convert number to address or bytes")
                 }
+                case ABI_DATA_TYPE.F64:{
+                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(o).buffer)))
+                }
             }
             throw new Error("unexpected abi type " + type)
         }
@@ -794,6 +843,9 @@
                         return o
                     throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
                 }
+                case ABI_DATA_TYPE.F64:{
+                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(o.toNumber()).buffer)))
+                }                
             }
             throw new Error("unexpected abi type " + type)
         }
@@ -814,6 +866,9 @@
                 case ABI_DATA_TYPE.BOOL: {
                     return o ? 1 : 0
                 }
+                case ABI_DATA_TYPE.F64:{
+                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(o ? 1 : 0).buffer)))
+                }                   
             }
             throw new Error("unexpected abi type " + type)
         }
@@ -845,7 +900,7 @@
                 return this.abiEncode([li])
 
             if (li === undefined || li === null)
-                return new Uint8Array(0)
+                return RLP.encode([[], []])
 
             const funcs = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)
             assert(funcs.length === 1, `exact exists one and only one function ${name}, while found ${funcs.length}`)
@@ -853,18 +908,22 @@
 
             if (Array.isArray(li)) {
                 const arr = []
+                const types = []
                 for (let i = 0; i < li.length; i++) {
                     arr[i] = convert(li[i], func.inputs[i].type)
+                    types[i] = ABI_DATA_ENUM[func.inputs[i].type]
                 }
-                return RLP.encode(arr)
+                return RLP.encode([types, arr])
             }
 
             const arr = []
+            const types = []
             for (let i = 0; i < func.inputs.length; i++) {
                 const input = func.inputs[i]
+                types[i] = ABI_DATA_ENUM[func.inputs[i].type]
                 arr[i] = convert(li[input.name], input.type)
             }
-            return RLP.encode(arr)
+            return RLP.encode([types, arr])
         }
 
         /**
@@ -1656,7 +1715,7 @@
      */
     function getTransaction(host, port, hash) {
         const url = `http://${host}:${port}/rpc/transaction/${hash}`
-        return rpcGet(url).then(Transaction.from)
+        return rpcGet(url).then(Transaction.of)
     }
 
     /**
