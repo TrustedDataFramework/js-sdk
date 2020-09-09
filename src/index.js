@@ -54,6 +54,8 @@
 
     const MAX_U64 = new BN('ffffffffffffffff', 16);
     const MAX_U256 = new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16);
+    const MAX_I64 = new BN('9223372036854775807', 10);
+    const MIN_I64 = new BN('-9223372036854775808', 10);
 
     /**
      * 截掉字节数组前面的 0
@@ -161,7 +163,9 @@
                 || type === ABI_DATA_TYPE.ADDRESS
                 || type === ABI_DATA_TYPE.BYTES
                 || type === ABI_DATA_TYPE.U256
-                || type === ABI_DATA_TYPE.BOOL,
+                || type === ABI_DATA_TYPE.BOOL
+                || type === ABI_DATA_TYPE.I64
+                || type === ABI_DATA_TYPE.F64,
                 `invalid abi type def type = ${type}`
             )
             this.type = type
@@ -391,14 +395,38 @@
         return buf.slice(k, buf.length);
     }
 
+
+    function reverse(arr) {
+        const ret = new Uint8Array(arr.length)
+        for (let i = 0; i < arr.length; i++) {
+            ret[i] = arr[arr.length - i - 1]
+        }
+        return ret
+    }
     /**
      * 
      * @param {Uint8Array} arr 
      */
-    function reverse(arr){
+    function f64ToBytes(f) {
+        let buf = new ArrayBuffer(8);
+        let float = new Float64Array(buf);
+        float[0] = f;
+        buf = new Uint8Array(buf)
+        return trimLeadingZeros(reverse(buf))
+    }
+
+    function bytesToF64(buf) {
+        return new Float64Array(padPrefix(reverse(buf), 0, 8).buffer)[0]
+    }
+
+    /**
+ * 
+ * @param {Uint8Array} arr 
+ */
+    function inverse(arr) {
         const ret = new Uint8Array(arr.length)
-        for(let i = 0; i < ret.length; i++){
-            ret[i] = arr.length - i
+        for (let i = 0; i < ret.length; i++) {
+            ret[i] = (~arr[i] & 0xff)
         }
         return ret
     }
@@ -702,8 +730,7 @@
         STRING: 'string', // 3 string
         BYTES: 'bytes', // 4
         ADDRESS: 'address', // 5
-        U256: 'u256', // 6
-        VOID: 'void'
+        U256: 'u256'// 6
     }
 
     const ABI_DATA_ENUM = {
@@ -736,7 +763,8 @@
             switch (type) {
                 case ABI_DATA_TYPE.BOOL:
                 case ABI_DATA_TYPE.U256:
-                case ABI_DATA_TYPE.U64: 
+                case ABI_DATA_TYPE.I64:
+                case ABI_DATA_TYPE.U64:
                 case ABI_DATA_TYPE.F64: {
                     throw new Error('cannot convert uint8array to u64, u256 or bool')
                 }
@@ -767,9 +795,17 @@
                         assert(ret.cmp(MAX_U256) <= 0, `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                     return ret
                 }
-                case ABI_DATA_TYPE.F64:{
+                case ABI_DATA_TYPE.I64: {
+                    if (o.substr(0, 2) === '0x') {
+                        let ret = new BN(o.substr(2, o.length - 2), 16)
+                        assert(ret.cmp(MAX_I64) <= 0, `${ret.toString(10)} overflows max i64 ${MAX_I64.toString(10)}`)
+                        return ret
+                    }
+                    return convert(parseInt(o), ABI_DATA_TYPE.I64)
+                }
+                case ABI_DATA_TYPE.F64: {
                     let f = parseFloat(o)
-                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(f).buffer)))
+                    return f64ToBytes(f)
                 }
                 case ABI_DATA_TYPE.STRING: {
                     return o
@@ -802,9 +838,9 @@
             switch (type) {
                 case ABI_DATA_TYPE.U256:
                 case ABI_DATA_TYPE.U64: {
-                    if (o < 0)
-                        throw new Error('o is negative')
-                    return new BN(o, 10)
+                    if (o < 0 || !Number.isInteger(o))
+                        throw new Error('o is negative or not a integer')
+                    return new BN(o)
                 }
                 case ABI_DATA_TYPE.STRING: {
                     return o.toString(10)
@@ -818,8 +854,15 @@
                 case ABI_DATA_TYPE.ADDRESS: {
                     throw new Error("cannot convert number to address or bytes")
                 }
-                case ABI_DATA_TYPE.F64:{
-                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(o).buffer)))
+                case ABI_DATA_TYPE.I64: {
+                    if (!Number.isInteger(o))
+                        throw new Error('o is negative or not a integer')
+                    if (o >= 0)
+                        return new BN(o)
+                    return convert(new BN(o), ABI_DATA_TYPE.I64)
+                }
+                case ABI_DATA_TYPE.F64: {
+                    return f64ToBytes(o)
                 }
             }
             throw new Error("unexpected abi type " + type)
@@ -843,9 +886,18 @@
                         return o
                     throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
                 }
-                case ABI_DATA_TYPE.F64:{
-                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(o.toNumber()).buffer)))
-                }                
+                case ABI_DATA_TYPE.I64: {
+                    assert(o.cmp(MAX_I64) <= 0, `${o.toString(10)} overflows max i64 ${MAX_I64.toString(10)}`)
+                    assert(o.cmp(MIN_I64) >= 0, `${o.toString(10)} overflows min i64 ${MIN_I64.toString(10)}`)
+                    if (o.cmp(new BN(0)) >= 0)
+                        return ret
+                    let buf = o.neg().toArray(Uint8Array, 8)
+                    buf = inverse(buf)
+                    return new BN(buf, 'be').add(new BN(1))
+                }
+                case ABI_DATA_TYPE.F64: {
+                    return f64ToBytes(o.toNumber())
+                }
             }
             throw new Error("unexpected abi type " + type)
         }
@@ -853,6 +905,7 @@
         if (typeof o === 'boolean') {
             switch (type) {
                 case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.I64:
                 case ABI_DATA_TYPE.U64: {
                     return o ? 1 : 0;
                 }
@@ -866,9 +919,9 @@
                 case ABI_DATA_TYPE.BOOL: {
                     return o ? 1 : 0
                 }
-                case ABI_DATA_TYPE.F64:{
-                    return trimLeadingZeros(reverse(new Uint8Array(Float64Array.of(o ? 1 : 0).buffer)))
-                }                   
+                case ABI_DATA_TYPE.F64: {
+                    return f64ToBytes(o ? 1 : 0)
+                }
             }
             throw new Error("unexpected abi type " + type)
         }
@@ -896,24 +949,31 @@
          * @returns { Uint8Array } rlp 编码后的参数
          */
         abiEncode(name, li) {
-            if (typeof li === 'string' || typeof li === 'number')
-                return this.abiEncode([li])
-
-            if (li === undefined || li === null)
-                return RLP.encode([[], []])
-
             const funcs = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)
             assert(funcs.length === 1, `exact exists one and only one function ${name}, while found ${funcs.length}`)
             const func = funcs[0]
 
+            let retType = func.outputs && func.outputs[0] && func.outputs[0].type
+            const retTypes = retType ? [ABI_DATA_ENUM[retType]] : []
+
+            if (typeof li === 'string' || typeof li === 'number')
+                return this.abiEncode([li])
+
+            if (li === undefined || li === null)
+                return RLP.encode([[], [], retTypes])
+
+
+
             if (Array.isArray(li)) {
                 const arr = []
                 const types = []
+                if (li.length != func.inputs.length)
+                    throw new Error(`abi encode failed for ${func.name}, expect ${func.inputs.length} parameters while ${li.length} found`)
                 for (let i = 0; i < li.length; i++) {
                     arr[i] = convert(li[i], func.inputs[i].type)
                     types[i] = ABI_DATA_ENUM[func.inputs[i].type]
                 }
-                return RLP.encode([types, arr])
+                return RLP.encode([types, arr, retTypes])
             }
 
             const arr = []
@@ -923,7 +983,7 @@
                 types[i] = ABI_DATA_ENUM[func.inputs[i].type]
                 arr[i] = convert(li[input.name], input.type)
             }
-            return RLP.encode([types, arr])
+            return RLP.encode([types, arr, retTypes])
         }
 
         /**
@@ -943,11 +1003,17 @@
                 return []
 
             const func = this.abi.filter(x => x.type === type && x.name === name)[0]
+            assert(func, `abi not foudn for ${name}`)
             const arr = RLP.decode(buf)
+
 
             const returnObject = func.outputs.every(v => v.name) && (
                 (new Set(func.outputs.map(v => v.name))).size === func.outputs.length
             )
+
+            if (arr.length != func.outputs.length)
+                throw new Error(`abi decode failed for ${func.name}, expect ${func.outputs.length} returns while ${arr.length} found`)
+
             const ret = returnObject ? {} : []
             for (let i = 0; i < arr.length; i++) {
                 const t = func.outputs[i].type
@@ -969,8 +1035,30 @@
                         val = val.toString(10)
                         break
                     }
+                    case ABI_DATA_TYPE.I64: {
+                        const padded = padPrefix(arr[i], 0, 8)
+                        const isneg = padded[0] & 0x80;
+                        if (!isneg) {
+                            val = new BN(arr[i], 'be').toString(10)
+                            break
+                        } else {
+                            val = new BN(inverse(padded), 'be')
+                            val = val.add(new BN(1))
+                            val = val.neg()
+                            val = val.toString(10)
+                            break
+                        }
+                    }
+                    case ABI_DATA_TYPE.F64: {
+                        val = bytesToF64(arr[i])
+                        break
+                    }
                     case ABI_DATA_TYPE.STRING: {
                         val = bin2str(arr[i])
+                        break
+                    }
+                    case ABI_DATA_TYPE.BOOL: {
+                        val = arr[i].length > 0
                         break
                     }
                 }
@@ -978,6 +1066,9 @@
                     ret[name] = val
                 else
                     ret[i] = val
+            }
+            if (type === ABI_TYPE.FUNCTION) {
+                return ret && ret[0]
             }
             return ret
         }
@@ -1147,7 +1238,7 @@
          * @param  { Contract } contract 合约
          * @param {string} method  查看的方法
          * @param { Object | Array } parameters  额外的参数，字节数组，参数列表
-         * @returns {Promise<Array>}
+         * @returns {Promise<Object>}
          */
         viewContract(contract, method, parameters) {
             if (!contract instanceof Contract)
@@ -1261,6 +1352,13 @@
         getNonce(pkOrAddress) {
             return this.getAccount(pkOrAddress)
                 .then(a => a.nonce)
+                .then(n => {
+                    const bn = new BN(n)
+                    const m = new BN(Number.MAX_SAFE_INTEGER)
+                    if (bn.cmp(m) <= 0)
+                        return parseInt(n)
+                    return bn
+                })
         }
 
         /**
@@ -1379,7 +1477,6 @@
             else
                 parameters = EMPTY_BYTES
 
-            const lenghtPrefix = padPrefix(numberToByteArray(binary.length), 0, 4)
             const toConcat = [
                 padPrefix(numberToByteArray(binary.length), 0, 4),
                 binary, parameters
@@ -1841,7 +1938,9 @@
         TX_STATUS: TX_STATUS,
         RLP, RLP,
         str2bin: str2bin,
-        bin2str: bin2str
+        bin2str: bin2str,
+        f64ToBytes: f64ToBytes,
+        bytesToF64: bytesToF64
     }
 
     if (!isBrowser)
