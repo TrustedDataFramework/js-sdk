@@ -952,7 +952,7 @@
          *
          * @param {string} name 调用方法名称
          * @param { Array | Object } li 参数列表
-         * @returns { Uint8Array } rlp 编码后的参数
+         * @returns { Array } rlp 编码后的参数
          */
         abiEncode(name, li) {
             const funcs = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)
@@ -966,8 +966,7 @@
                 return this.abiEncode([li])
 
             if (li === undefined || li === null)
-                return RLP.encode([[], [], retTypes])
-
+                return [[], [], retTypes]
 
 
             if (Array.isArray(li)) {
@@ -979,7 +978,7 @@
                     arr[i] = convert(li[i], func.inputs[i].type)
                     types[i] = ABI_DATA_ENUM[func.inputs[i].type]
                 }
-                return RLP.encode([types, arr, retTypes])
+                return [types, arr, retTypes]
             }
 
             const arr = []
@@ -989,7 +988,7 @@
                 types[i] = ABI_DATA_ENUM[func.inputs[i].type]
                 arr[i] = convert(li[input.name], input.type)
             }
-            return RLP.encode([types, arr, retTypes])
+            return [types, arr, retTypes]
         }
 
         /**
@@ -1075,6 +1074,17 @@
             }
             if (type === ABI_TYPE.FUNCTION) {
                 return ret && ret[0]
+            }
+            return ret
+        }
+
+        /**
+         * 合约部署的 paylod
+         */
+        abiToBinary() {
+            const ret = []
+            for (let a of this.abi) {
+                ret.push([a.name, a.type === ABI_TYPE.FUNCTION ? 0 : 1, a.inputs.map(x => ABI_DATA_ENUM[x.type]), a.outputs.map(x => ABI_DATA_ENUM[x.type])])
             }
             return ret
         }
@@ -1481,13 +1491,9 @@
             if (contract.abi.filter(x => x.name === 'init').length > 0)
                 parameters = contract.abiEncode('init', parameters)
             else
-                parameters = EMPTY_BYTES
+                parameters = [[], [], []]
 
-            const toConcat = [
-                padPrefix(numberToByteArray(binary.length), 0, 4),
-                binary, parameters
-            ]
-            return this.buildCommon(constants.DEPLOY, amount, concatBytes(toConcat), '')
+            return this.buildCommon(constants.DEPLOY, amount, RLP.encode([binary, parameters, contract.abiToBinary()]), '')
         }
 
         /**
@@ -1517,7 +1523,7 @@
             const addr = contract.address
             parameters = contract.abiEncode(method, parameters)
 
-            return this.buildCommon(constants.CONTRACT_CALL, amount, encodeHex(buildArgs(method, parameters)), addr)
+            return this.buildCommon(constants.CONTRACT_CALL, amount, RLP.encode([method, parameters]), addr)
         }
 
         /**
@@ -1767,8 +1773,8 @@
      * @param parameters { Uint8Array | string} 额外的参数，字节数组
      * @returns {Promise<string>}
      */
-    function viewContract(host, port, address, method, parameters) {
-        const args = buildArgs(method, parameters)
+    function viewContract(host, port, address, method, params) {
+        const args = RLP.encode([method, params])
         const url = `http://${host}:${port}/rpc/contract/${address}?args=${encodeHex(args)}`
         return rpcGet(url)
     }
@@ -1898,21 +1904,6 @@
                 sk,
                 { userId: 'userid@soie-chain.com', der: false, hash: true }
             )
-    }
-
-    /**
-     * 构造合约调用的 payload，或者查看合约的
-     * @param method {string} 调用的方法名
-     * @param parameters {string | Uint8Array } 调用的额外参数
-     * @returns { Uint8Array }
-     */
-    function buildArgs(method, parameters) {
-        const m = str2bin(method)
-        const l = new Uint8Array([m.length])
-        if (typeof parameters === 'string')
-            parameters = decodeHex(parameters)
-        const a = parameters ? parameters : EMPTY_BYTES
-        return concatBytes([l, m, a])
     }
 
     /**
