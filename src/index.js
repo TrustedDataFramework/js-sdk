@@ -100,7 +100,7 @@
     }
 
     /**
-     * 判断是否是合法的十六进制字符串，不以 0x 开头
+     * 判断是否是合法的十六进制字符串，不能以 0x 开头
      * @param {string} hex
      * @returns
      */
@@ -403,8 +403,9 @@
         }
         return ret
     }
+
     /**
-     * 
+     * 浮点数转字节数组
      * @param {Uint8Array} arr 
      */
     function f64ToBytes(f) {
@@ -415,14 +416,19 @@
         return trimLeadingZeros(reverse(buf))
     }
 
+    /**
+     * 字节数组转浮点数
+     * @param {Uint8Array} buf 
+     */
     function bytesToF64(buf) {
         return new Float64Array(padPrefix(reverse(buf), 0, 8).buffer)[0]
     }
 
+
     /**
- * 
- * @param {Uint8Array} arr 
- */
+     * 对字节数组取反
+     * @param {Uint8Array} arr 
+     */
     function inverse(arr) {
         const ret = new Uint8Array(arr.length)
         for (let i = 0; i < ret.length; i++) {
@@ -1946,7 +1952,7 @@
     if (!isBrowser)
         module.exports = tool
     else {
-        window.tool = tool
+        window.tdsSDK = tool
     }
 
     /**
