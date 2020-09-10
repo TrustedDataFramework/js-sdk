@@ -33,6 +33,29 @@
         DROPPED: 3
     }
 
+
+    /**
+     * 转成安全范围内的整数
+     * @param {string | number | ArrayBuffer | Uint8Array | BN }
+     * @returns { string | number}
+     */
+    function toSafeInt(x) {
+        if (typeof x === 'number')
+            return x
+        if (typeof x === 'string') {
+            const hex = x.startsWith('0x')
+            if (hex)
+                x = x.substr(2, x.length - 2)
+            x = new BN(x, hex ? 16 : 10)
+        }
+        if (x instanceof ArrayBuffer || x instanceof Uint8Array)
+            x = new BN(x, 'be')
+
+        if (x.cmp(MAX_SAFE_INTEGER) <= 0 && x.cmp(MIN_SAFE_INTEGER) >= 0)
+            return x.toNumber()
+        return x.toString()
+    }
+
     /**
      * 随机生成字节数组 Uint8Array
      * @param {number} length 字节数组长度
@@ -56,6 +79,9 @@
     const MAX_U256 = new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16);
     const MAX_I64 = new BN('9223372036854775807', 10);
     const MIN_I64 = new BN('-9223372036854775808', 10);
+    const MAX_SAFE_INTEGER = new BN(Number.MAX_SAFE_INTEGER);
+    const MIN_SAFE_INTEGER = new BN(Number.MIN_SAFE_INTEGER);
+    const ONE = new BN(1)
 
     /**
      * 截掉字节数组前面的 0
@@ -84,11 +110,14 @@
     }
 
     /**
+     * 解析十六进制字符串
      * decode hex string
      * @param {string} s
      * @returns {Uint8Array}
      */
     function decodeHex(s) {
+        if (s.startsWith('0x'))
+            s = s.substr(2, s.length - 2)
         assert(s.length % 2 === 0, 'invalid char');
         const ret = new Uint8Array(s.length / 2);
         for (let i = 0; i < s.length / 2; i++) {
@@ -102,7 +131,7 @@
     /**
      * 判断是否是合法的十六进制字符串，不能以 0x 开头
      * @param {string} hex
-     * @returns
+     * @returns {boolean}
      */
     function isHex(hex) {
         if (hex.length % 2 !== 0)
@@ -119,8 +148,8 @@
     }
 
     /**
-     * convert bytes like objects to hex string
-     * @param {string | ArrayBuffer | Uint8Array } s
+     * convert bytes like objects to hex string 十六进制编码
+     * @param {string | ArrayBuffer | Uint8Array } s 
      * @returns {string}
      */
     function bin2hex(s) {
@@ -136,7 +165,7 @@
     }
 
     /**
-     * convert digital like objects to digital string
+     * convert digital like objects to digital string 转成十进制表示的字符串
      * @param {string | BN | number } s
      * @returns {string}
      */
@@ -145,7 +174,7 @@
             if (s.startsWith('0x'))
                 s = new BN(s.substr(2), 16)
             else
-                s = new BN(s, 10)
+                return s
         }
         return s.toString(10)
     }
@@ -157,6 +186,7 @@
          * @param {string} name
          */
         constructor(type, name) {
+            type = type && type.toLowerCase()
             assert(
                 type === ABI_DATA_TYPE.STRING
                 || type === ABI_DATA_TYPE.U64
@@ -191,6 +221,7 @@
          * @param {Array<TypeDef>} outputs
          */
         constructor(name, type, inputs, outputs) {
+            type = type && type.toLowerCase()
             assert(name, 'expect name of abi')
             assert(type === ABI_TYPE.FUNCTION || type === ABI_TYPE.EVENT, `invalid abi type ${type}`)
             assert(!inputs || Array.isArray(inputs), `invalid inputs ${inputs}`)
@@ -205,11 +236,119 @@
         static from(o) {
             return new ABI(o.name, o.type, o.inputs, o.outputs)
         }
+
+        returnsObj() {
+            return this.outputs.every(v => v.name) && (
+                (new Set(this.outputs.map(v => v.name))).size === this.outputs.length
+            )
+        }
+
+        inputsObj() {
+            return this.inputs.every(v => v.name) && (
+                (new Set(this.inputs.map(v => v.name))).size === this.inputs.length
+            )
+        }
+
+        toObj(arr, input) {
+            const p = input ? this.inputs : this.outputs
+            const o = {}
+            for (let i = 0; i < p.length; i++) {
+                o[p[i].name] = arr[i]
+            }
+            return o
+        }
+
+        toArr(obj, input) {
+            const p = input ? this.inputs : this.outputs
+            const arr = []
+            for (let i = 0; i < p.length; i++) {
+                arr.push(obj[p[i].name])
+            }
+            return arr
+        }
+    }
+
+    /**
+     * 
+     * @param {Array<TypeDef>} outputs
+     * @param {string | ArrayBuffer | Array<Uint8Array> | Uint8Array} buf 
+     */
+    function abiDecode(outputs, buf) {
+        if (!buf)
+            buf = ''
+        if (typeof buf === 'string')
+            buf = decodeHex(buf)
+        if (buf.length === 0)
+            return []
+
+        const arr = Array.isArray(buf) ? buf : RLP.decode(buf)
+
+        const returnObject =
+            outputs.every(v => v.name) && (
+                (new Set(outputs.map(v => v.name))).size === outputs.length
+            )
+
+        if (arr.length != outputs.length)
+            throw new Error(`abi decode failed , expect ${outputs.length} returns while ${arr.length} found`)
+
+        const ret = returnObject ? {} : []
+        for (let i = 0; i < arr.length; i++) {
+            const t = outputs[i].type
+            const name = outputs[i].name
+            let val
+            switch (t) {
+                case ABI_DATA_TYPE.BYTES:
+                case ABI_DATA_TYPE.ADDRESS: {
+                    val = encodeHex(arr[i])
+                    break
+                }
+                case ABI_DATA_TYPE.U256:
+                case ABI_DATA_TYPE.U64: {
+                    val = new BN(arr[i], 'be')
+                    if (t === ABI_DATA_TYPE.U64)
+                        assert(val.cmp(MAX_U64) <= 0, `${val.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
+                    if (t === ABI_DATA_TYPE.U256)
+                        assert(val.cmp(MAX_U256) <= 0, `${val.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
+                    val = toSafeInt(val)
+                    break
+                }
+                case ABI_DATA_TYPE.I64: {
+                    const padded = padPrefix(arr[i], 0, 8)
+                    const isneg = padded[0] & 0x80;
+                    if (!isneg) {
+                        val = new BN(arr[i], 'be')
+                    } else {
+                        val = new BN(inverse(padded), 'be')
+                        val = val.add(ONE)
+                        val = val.neg()
+                    }
+                    val = toSafeInt(val)
+                    break
+                }
+                case ABI_DATA_TYPE.F64: {
+                    val = bytesToF64(arr[i])
+                    break
+                }
+                case ABI_DATA_TYPE.STRING: {
+                    val = bin2str(arr[i])
+                    break
+                }
+                case ABI_DATA_TYPE.BOOL: {
+                    val = arr[i].length > 0
+                    break
+                }
+            }
+            if (returnObject)
+                ret[name] = val
+            else
+                ret[i] = val
+        }
+        return ret
     }
 
     class Transaction {
         /**
-         *
+         * constructor of transaction
          * @param {string | number | BN} [version]
          * @param {string | number | BN} [type]
          * @param {string | number | BN} [createdAt]
@@ -221,8 +360,10 @@
          * @param {string | Uint8Array | ArrayBuffer } [payload]
          * @param {string | Uint8Array | ArrayBuffer} [to]
          * @param {string | Uint8Array | ArrayBuffer } [signature]
+         * @param { Array<ABI> } [__abi] abi 
+         * @param { Array | Object } [__inputs] inputs
          */
-        constructor(version, type, createdAt, nonce, from, gasLimit, gasPrice, amount, payload, to, signature) {
+        constructor(version, type, createdAt, nonce, from, gasLimit, gasPrice, amount, payload, to, signature, __abi, __inputs) {
             if (typeof createdAt === 'string' && isNaN(createdAt)) {
                 try {
                     createdAt = (new Date(createdAt).valueOf()) / 1000
@@ -241,9 +382,11 @@
             this.payload = bin2hex(payload || '')
             this.to = bin2hex(to || '')
             this.signature = bin2hex(signature || '')
+            this.__abi = __abi
+            this.__inputs = __inputs
         }
 
-        static of(o) {
+        static from(o) {
             return new Transaction(o.version, o.type, o.createdAt, o.nonce, o.from, o.gasLimit, o.gasPrice, o.amount, o.payload, o.to, o.signature)
         }
 
@@ -274,6 +417,47 @@
                 convert(this.to || EMPTY_BYTES, ABI_DATA_TYPE.ADDRESS)
             ]
             return RLP.encode(arr)
+        }
+
+        __setInputs(__inputs) {
+            const cnv = (x) => {
+                if (x instanceof ArrayBuffer || x instanceof Uint8Array)
+                    return encodeHex(x)
+                if (x instanceof BN)
+                    return x.toString(10)
+                return x
+            }
+            if (Array.isArray(__inputs)) {
+                this.__inputs = __inputs.map(cnv)
+            } else {
+                this.__inputs = {}
+                for (let k of Object.keys(__inputs)) {
+                    this.__inputs[k] = cnv(__inputs[k])
+                }
+            }
+            if (Array.isArray(this.__inputs)) {
+                const c = new Contract('', this.__abi)
+                const a = c.getABI(this.getMethod(), ABI_TYPE.FUNCTION)
+                if (a.inputsObj()) {
+                    this.__inputs = a.toObj(this.__inputs, true)
+                }
+            }
+        }
+
+        getMethod() {
+            const t = parseInt(this.type)
+            return t === constants.DEPLOY ? 'init' : bin2str((RLP.decode(decodeHex(this.payload)))[0])
+        }
+
+        isDeployOrCall() {
+            const t = parseInt(this.type)
+            return t === constants.DEPLOY || t === constants.CONTRACT_CALL
+        }
+
+        isBuiltInCall() {
+            return this.isDeployOrCall() &&
+                (this.to === constants.PEER_AUTHENTICATION_ADDR || this.to === constants.POA_AUTHENTICATION_ADDR
+                    || this.to == constants.POS_CONTRACT_ADDR)
         }
     }
 
@@ -314,7 +498,7 @@
     }
 
     /**
-     *
+     * 十六进制字符串编码
      * @param { ArrayBuffer | Uint8Array } buf binary
      * @returns {string} encoded result
      */
@@ -805,6 +989,7 @@
                     if (o.substr(0, 2) === '0x') {
                         let ret = new BN(o.substr(2, o.length - 2), 16)
                         assert(ret.cmp(MAX_I64) <= 0, `${ret.toString(10)} overflows max i64 ${MAX_I64.toString(10)}`)
+                        assert(ret.cmp(MIN_I64) >= 0, `${ret.toString(10)} overflows min i64 ${MIN_I64.toString(10)}`)
                         return ret
                     }
                     return convert(parseInt(o), ABI_DATA_TYPE.I64)
@@ -831,9 +1016,6 @@
                 }
                 case ABI_DATA_TYPE.BYTES:
                 case ABI_DATA_TYPE.ADDRESS: {
-                    if (o.substr(0, 2) === '0x') {
-                        o = o.substr(2, o.length - 2)
-                    }
                     return decodeHex(o)
                 }
             }
@@ -899,7 +1081,7 @@
                         return ret
                     let buf = o.neg().toArray(Uint8Array, 8)
                     buf = inverse(buf)
-                    return new BN(buf, 'be').add(new BN(1))
+                    return new BN(buf, 'be').add(ONE)
                 }
                 case ABI_DATA_TYPE.F64: {
                     return f64ToBytes(o.toNumber())
@@ -955,14 +1137,11 @@
          * @returns { Array } rlp 编码后的参数
          */
         abiEncode(name, li) {
-            const funcs = this.abi.filter(x => x.type === ABI_TYPE.FUNCTION && x.name === name)
-            assert(funcs.length === 1, `exact exists one and only one function ${name}, while found ${funcs.length}`)
-            const func = funcs[0]
-
+            const func = this.getABI(name, ABI_TYPE.FUNCTION)
             let retType = func.outputs && func.outputs[0] && func.outputs[0].type
             const retTypes = retType ? [ABI_DATA_ENUM[retType]] : []
 
-            if (typeof li === 'string' || typeof li === 'number')
+            if (typeof li === 'string' || typeof li === 'number' || li instanceof BN || li instanceof ArrayBuffer || li instanceof Uint8Array || typeof li === 'boolean')
                 return this.abiEncode([li])
 
             if (li === undefined || li === null)
@@ -986,6 +1165,9 @@
             for (let i = 0; i < func.inputs.length; i++) {
                 const input = func.inputs[i]
                 types[i] = ABI_DATA_ENUM[func.inputs[i].type]
+                if (!(input.name in li)) {
+                    throw new Error(`key ${input.name} not found in parameters`)
+                }
                 arr[i] = convert(li[input.name], input.type)
             }
             return [types, arr, retTypes]
@@ -994,7 +1176,7 @@
         /**
          *
          * @param name {string} 方法名称
-         * @param buf {Uint8Array | string}
+         * @param buf { Uint8Array | string | Array<Uin8Array> }
          * @returns { Array | Object } rlp 解码后的参数列表
          * @param {string} [type] 类型
          */
@@ -1007,74 +1189,10 @@
             if (buf.length === 0)
                 return []
 
-            const func = this.abi.filter(x => x.type === type && x.name === name)[0]
-            assert(func, `abi not foudn for ${name}`)
-            const arr = RLP.decode(buf)
-
-
-            const returnObject = func.outputs.every(v => v.name) && (
-                (new Set(func.outputs.map(v => v.name))).size === func.outputs.length
-            )
-
-            if (arr.length != func.outputs.length)
-                throw new Error(`abi decode failed for ${func.name}, expect ${func.outputs.length} returns while ${arr.length} found`)
-
-            const ret = returnObject ? {} : []
-            for (let i = 0; i < arr.length; i++) {
-                const t = func.outputs[i].type
-                const name = func.outputs[i].name
-                let val
-                switch (t) {
-                    case ABI_DATA_TYPE.BYTES:
-                    case ABI_DATA_TYPE.ADDRESS: {
-                        val = encodeHex(arr[i])
-                        break
-                    }
-                    case ABI_DATA_TYPE.U256:
-                    case ABI_DATA_TYPE.U64: {
-                        val = new BN(arr[i], 'be')
-                        if (t === ABI_DATA_TYPE.U64)
-                            assert(val.cmp(MAX_U64) <= 0, `${val.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
-                        if (t === ABI_DATA_TYPE.U256)
-                            assert(val.cmp(MAX_U256) <= 0, `${val.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
-                        val = val.toString(10)
-                        break
-                    }
-                    case ABI_DATA_TYPE.I64: {
-                        const padded = padPrefix(arr[i], 0, 8)
-                        const isneg = padded[0] & 0x80;
-                        if (!isneg) {
-                            val = new BN(arr[i], 'be').toString(10)
-                            break
-                        } else {
-                            val = new BN(inverse(padded), 'be')
-                            val = val.add(new BN(1))
-                            val = val.neg()
-                            val = val.toString(10)
-                            break
-                        }
-                    }
-                    case ABI_DATA_TYPE.F64: {
-                        val = bytesToF64(arr[i])
-                        break
-                    }
-                    case ABI_DATA_TYPE.STRING: {
-                        val = bin2str(arr[i])
-                        break
-                    }
-                    case ABI_DATA_TYPE.BOOL: {
-                        val = arr[i].length > 0
-                        break
-                    }
-                }
-                if (returnObject)
-                    ret[name] = val
-                else
-                    ret[i] = val
-            }
-            if (type === ABI_TYPE.FUNCTION) {
+            const a = this.getABI(name, type)
+            const ret = abiDecode(a.outputs, buf)
+            if (type === ABI_TYPE.FUNCTION)
                 return ret && ret[0]
-            }
             return ret
         }
 
@@ -1087,6 +1205,18 @@
                 ret.push([a.name, a.type === ABI_TYPE.FUNCTION ? 0 : 1, a.inputs.map(x => ABI_DATA_ENUM[x.type]), a.outputs.map(x => ABI_DATA_ENUM[x.type])])
             }
             return ret
+        }
+
+        /**
+         * 
+         * @param {string} name 
+         * @param {string} type 
+         * @returns {ABI}
+         */
+        getABI(name, type) {
+            const funcs = this.abi.filter(x => x.type === type && x.name === name)
+            assert(funcs.length === 1, `exact exists one and only one abi ${name}, while found ${funcs.length}`)
+            return funcs[0]
         }
     }
 
@@ -1102,35 +1232,35 @@
             this.host = host || 'localhost'
             this.port = port || 80
 
-            this._callbacks = new Map() // id -> function
-            this._id2key = new Map()// id -> address:event
-            this._id2hash = new Map()  // id -> txhash
-            this._eventHandlers = new Map() // address:event -> [id]
-            this._tx_observers = new Map() // hash -> [id]
-            this._cid = 0
+            this.__callbacks = new Map() // id -> function
+            this.__id2key = new Map()// id -> address:event
+            this.__id2hash = new Map()  // id -> txhash
+            this.__eventHandlers = new Map() // address:event -> [id]
+            this.__txObservers = new Map() // hash -> [id]
+            this.__cid = 0
         }
 
-        _tryConnect() {
-            if (this._ws)
+        __tryConnect() {
+            if (this.__ws)
                 return
             const WS = isBrowser ? WebSocket : require('ws')
-            this._ws = new WS(`ws://${this.host}:${this.port || 80}/websocket`)
-            this._ws.onmessage = (e) => {
+            this.__ws = new WS(`ws://${this.host}:${this.port || 80}/websocket`)
+            this.__ws.onmessage = (e) => {
                 if (!isBrowser) {
-                    this._handleData(e.data)
+                    this.__handleData(e.data)
                     return
                 }
                 const reader = new FileReader();
 
                 reader.onload = () => {
                     var arrayBuffer = reader.result
-                    this._handleData(new Uint8Array(arrayBuffer))
+                    this.__handleData(new Uint8Array(arrayBuffer))
                 };
                 reader.readAsArrayBuffer(e.data)
             }
         }
 
-        _handleData(data) {
+        __handleData(data) {
             const decoded = RLP.decode(data)
             const i = new BN(decoded[0], 'be')
             switch (i.toString(10)) {
@@ -1140,11 +1270,19 @@
                     let d = null
                     if (s === TX_STATUS.DROPPED)
                         d = bin2str(decoded[3])
-                    if (s === TX_STATUS.INCLUDED)
-                        d = encodeHex(decoded[3])
-                    const funcIds = this._tx_observers.get(h) || []
+                    if (s === TX_STATUS.INCLUDED) {
+                        const arr = decoded[3]
+                        d = {
+                            blockHeight: toSafeInt(arr[0]),
+                            blockHash: encodeHex(arr[1]),
+                            gasUsed: toSafeInt(arr[2]),
+                            result: arr[3],
+                            events: arr[4]
+                        }
+                    }
+                    const funcIds = this.__txObservers.get(h) || []
                     for (const funcId of funcIds) {
-                        const func = this._callbacks.get(funcId)
+                        const func = this.__callbacks.get(funcId)
                         func(h, s, d)
                     }
                     break
@@ -1152,9 +1290,9 @@
                 case '1': {
                     const addr = encodeHex(decoded[1])
                     const event = bin2str(decoded[2])
-                    const funcIds = this._eventHandlers.get(`${addr}:${event}`) || []
+                    const funcIds = this.__eventHandlers.get(`${addr}:${event}`) || []
                     for (const funcId of funcIds) {
-                        const func = this._callbacks.get(funcId)
+                        const func = this.__callbacks.get(funcId)
                         func(addr, event, decoded[3])
                     }
                     break
@@ -1166,23 +1304,23 @@
          * 监听合约事件
          * @param {Contract} contract 合约
          * @param {string} event 事件
-         * @param {Function} func 合约事件回调 (address, event, parameters)
+         * @param {Function} func 合约事件回调 {name: event, data: data}
          * @returns {number} 监听器的 id
          */
         listen(contract, event, func) {
-            this._tryConnect()
-            const id = ++this._cid
+            this.__tryConnect()
+            const id = ++this.__cid
             const key = `${contract.address}:${event}`
-            this._id2key.set(id, key)
-            const fn = (addr, event, parameters) => {
+            this.__id2key.set(id, key)
+            const fn = (_, event, parameters) => {
                 const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
-                func(addr, event, abiDecoded)
+                func(abiDecoded)
             }
-            if (!this._eventHandlers.has(key))
-                this._eventHandlers.set(key, new Set())
+            if (!this.__eventHandlers.has(key))
+                this.__eventHandlers.set(key, new Set())
 
-            this._eventHandlers.get(key).add(id)
-            this._callbacks.set(id, fn)
+            this.__eventHandlers.get(key).add(id)
+            this.__callbacks.set(id, fn)
 
             return id
         }
@@ -1193,26 +1331,26 @@
          * @param {number} id 监听器的 id
          */
         removeListener(id) {
-            const key = this._id2key.get(id)
-            const h = this._id2hash.get(id)
-            this._callbacks.delete(id)
-            this._id2key.delete(id)
-            this._id2hash.delete(id)
+            const key = this.__id2key.get(id)
+            const h = this.__id2hash.get(id)
+            this.__callbacks.delete(id)
+            this.__id2key.delete(id)
+            this.__id2hash.delete(id)
             if (key) {
-                const set = this._eventHandlers.get(key)
+                const set = this.__eventHandlers.get(key)
                 set && set.delete(id)
             }
             if (h) {
-                const set = this._tx_observers.get(h)
+                const set = this.__txObservers.get(h)
                 set && set.delete(id)
             }
         }
 
         listenOnce(contract, event, func) {
-            this._tryConnect()
-            const id = this._cid + 1
-            this.listen(contract, event, (addr, e, p) => {
-                func(addr, e, p)
+            this.__tryConnect()
+            const id = this.__cid + 1
+            this.listen(contract, event, (p) => {
+                func(p)
                 this.removeListener(id)
             })
         }
@@ -1224,16 +1362,16 @@
          * @returns {number}
          */
         observe(hash, cb) {
-            this._tryConnect()
-            const id = ++this._cid
+            this.__tryConnect()
+            const id = ++this.__cid
             if (isBytes(hash))
                 hash = encodeHex(hash)
 
             hash = hash.toLowerCase()
-            if (!this._tx_observers.has(hash))
-                this._tx_observers.set(hash, new Set())
-            this._id2hash.set(id, hash)
-            this._tx_observers.get(hash).add(id)
+            if (!this.__txObservers.has(hash))
+                this.__txObservers.set(hash, new Set())
+            this.__id2hash.set(id, hash)
+            this.__txObservers.get(hash).add(id)
 
             const fn = (h, s, d) => {
                 cb(h, s, d)
@@ -1244,7 +1382,7 @@
                         break
                 }
             }
-            this._callbacks.set(id, fn)
+            this.__callbacks.set(id, fn)
             return id
         }
 
@@ -1282,23 +1420,70 @@
             return sendTransaction(this.host, this.port, tx)
         }
 
-        _observeTx(tx, timeout) {
+        /**
+         * 
+         * @param { Transaction } tx 
+         * @param { number } timeout 
+         */
+        __observeTx(tx, timeout) {
             return new Promise((resolve, reject) => {
                 let success = false
 
                 if (timeout)
                     setTimeout(() => {
                         if (success) return
-                        reject({ transaction: tx, reason: 'timeout' })
-                    }, timeout
-                    )
+                        reject({ reason: 'timeout' })
+                    }, timeout)
+
+                let ret = null
+                let confirmed = false
+                let included = false
 
                 this.observe(tx.getHash(), (h, s, d) => {
-                    if (s === TX_STATUS.DROPPED)
-                        reject({ transaction: tx, reason: d })
+                    if (s === TX_STATUS.DROPPED) {
+                        const e = { hash: h, reason: d }
+                        reject(e)
+                        return
+                    }
                     if (s === TX_STATUS.CONFIRMED) {
-                        success = true
-                        resolve(tx)
+                        confirmed = true
+                        if (included) {
+                            success = true
+                            resolve(ret)
+                            return
+                        }
+                    }
+                    if (s === TX_STATUS.INCLUDED) {
+                        included = true
+                        ret = d
+                        if (d.result && d.result.length
+                            && tx.__abi
+                            && tx.isDeployOrCall()
+                            && (!tx.isBuiltInCall())) {
+                            const decoded = (new Contract('', tx.__abi)).abiDecode(tx.getMethod(), d.result)
+                            ret.result = decoded
+                        }
+
+                        if (
+                            d.events.length
+                            && tx.__abi) {
+                            const events = []
+                            for(let e of d.events){
+                                const name = bin2str(e[0])
+                                const decoded = (new Contract('', tx.__abi)).abiDecode(name, e[1], ABI_TYPE.EVENT)
+                                events.push({name: name, data: decoded})
+                            }
+                            ret.events = events
+                        }
+
+                        ret.transactionHash = tx.getHash()
+                        ret.method = tx.getMethod()
+                        ret.inputs = tx.__inputs
+                        if (confirmed) {
+                            success = true
+                            resolve(ret)
+                            return
+                        }
                     }
                 })
             })
@@ -1314,11 +1499,11 @@
             if (Array.isArray(tx)) {
                 const arr = []
                 for (const t of tx) {
-                    arr.push(this._observeTx(t, timeout))
+                    arr.push(this.__observeTx(t, timeout))
                 }
                 ret = Promise.all(arr)
             } else {
-                ret = this._observeTx(tx, timeout)
+                ret = this.__observeTx(tx, timeout)
             }
             this.sendTransaction(tx)
             return ret
@@ -1368,13 +1553,7 @@
         getNonce(pkOrAddress) {
             return this.getAccount(pkOrAddress)
                 .then(a => a.nonce)
-                .then(n => {
-                    const bn = new BN(n)
-                    const m = new BN(Number.MAX_SAFE_INTEGER)
-                    if (bn.cmp(m) <= 0)
-                        return parseInt(n)
-                    return bn
-                })
+                .then(toSafeInt)
         }
 
         /**
@@ -1422,10 +1601,10 @@
         }
 
         close() {
-            if (this._ws) {
-                const _ws = this._ws
-                this._ws = null
-                _ws.close()
+            if (this.__ws) {
+                const __ws = this.__ws
+                this.__ws = null
+                __ws.close()
             }
         }
     }
@@ -1452,7 +1631,7 @@
 
         increaseNonce() {
             this.nonce = convert(this.nonce, ABI_DATA_TYPE.U64)
-            this.nonce = this.nonce.add(new BN(1))
+            this.nonce = this.nonce.add(ONE)
         }
 
         /**
@@ -1483,9 +1662,7 @@
 
             if (!parameters)
                 parameters = []
-
-            if (isBytes(parameters) || typeof parameters === 'string')
-                throw new Error('parameters should be an raw js object or array')
+            const inputs = parameters
 
             const binary = contract.binary
             if (contract.abi.filter(x => x.name === 'init').length > 0)
@@ -1493,7 +1670,10 @@
             else
                 parameters = [[], [], []]
 
-            return this.buildCommon(constants.DEPLOY, amount, RLP.encode([binary, parameters, contract.abiToBinary()]), '')
+            const ret = this.buildCommon(constants.DEPLOY, amount, RLP.encode([binary, parameters, contract.abiToBinary()]), '')
+            ret.__abi = contract.abi
+            ret.__setInputs(inputs)
+            return ret
         }
 
         /**
@@ -1516,14 +1696,17 @@
 
             if (!parameters)
                 parameters = []
-
+            const inputs = parameters
             if (parameters instanceof Uint8Array || typeof parameters === 'string')
                 throw new Error('parameters should be an raw js object or array')
 
             const addr = contract.address
             parameters = contract.abiEncode(method, parameters)
 
-            return this.buildCommon(constants.CONTRACT_CALL, amount, RLP.encode([method, parameters]), addr)
+            const ret = this.buildCommon(constants.CONTRACT_CALL, amount, RLP.encode([method, parameters]), addr)
+            ret.__abi = contract.abi
+            ret.__setInputs(inputs)
+            return ret
         }
 
         /**
@@ -1824,7 +2007,7 @@
      */
     function getTransaction(host, port, hash) {
         const url = `http://${host}:${port}/rpc/transaction/${hash}`
-        return rpcGet(url).then(Transaction.of)
+        return rpcGet(url)
     }
 
     /**
