@@ -33,6 +33,10 @@
         DROPPED: 3
     }
 
+    function copy(dst, src){
+        for(let key of Object.keys(src))
+            dst[key] = src[key]
+    }
 
     /**
      * 转成安全范围内的整数
@@ -1455,7 +1459,11 @@
                     }
                     if (s === TX_STATUS.INCLUDED) {
                         included = true
-                        ret = d
+                        ret = {                     
+                            blockHeight: d.blockHeight,
+                            blockHash: d.blockHash,
+                            gasUsed: d.gasUsed,
+                        }
                         if (d.result && d.result.length
                             && tx.__abi
                             && tx.isDeployOrCall()
@@ -1476,11 +1484,13 @@
                             ret.events = events
                         }
 
-                        if(Array.isArray(ret.result))
-                            ret.result = ret.result[0] || null
                         ret.transactionHash = tx.getHash()
-                        ret.method = tx.getMethod()
-                        ret.inputs = tx.__inputs
+                        ret.fee = toSafeInt((new BN(tx.gasPrice).mul(new BN(ret.gasUsed))))
+                        if(tx.isDeployOrCall()){
+                            ret.method = tx.getMethod()
+                            ret.inputs = tx.__inputs
+                        }
+               
                         if (confirmed) {
                             success = true
                             resolve(ret)
