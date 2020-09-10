@@ -1476,6 +1476,8 @@
                             ret.events = events
                         }
 
+                        if(Array.isArray(ret.result))
+                            ret.result = ret.result[0] || null
                         ret.transactionHash = tx.getHash()
                         ret.method = tx.getMethod()
                         ret.inputs = tx.__inputs
