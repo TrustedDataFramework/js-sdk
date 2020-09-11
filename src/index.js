@@ -33,8 +33,8 @@
         DROPPED: 3
     }
 
-    function copy(dst, src){
-        for(let key of Object.keys(src))
+    function copy(dst, src) {
+        for (let key of Object.keys(src))
             dst[key] = src[key]
     }
 
@@ -116,10 +116,12 @@
     /**
      * 解析十六进制字符串
      * decode hex string
-     * @param {string} s
+     * @param {string | ArrayBuffer | Uint8Array} s
      * @returns {Uint8Array}
      */
     function decodeHex(s) {
+        if (isBytes(s))
+            return toU8Arr(s)
         if (s.startsWith('0x'))
             s = s.substr(2, s.length - 2)
         assert(s.length % 2 === 0, 'invalid char');
@@ -428,7 +430,7 @@
                 if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                     return encodeHex(x)
                 if (x instanceof BN)
-                    return x.toString(10)
+                    return toSafeInt(x)
                 return x
             }
             if (Array.isArray(__inputs)) {
@@ -1245,10 +1247,23 @@
         }
 
         __tryConnect() {
-            if (this.__ws)
-                return
             const WS = isBrowser ? WebSocket : require('ws')
-            this.__ws = new WS(`ws://${this.host}:${this.port || 80}/websocket`)
+            if (this.__ws && this.__ws.readyState === WS.OPEN) {
+                return Promise.resolve(this)
+            }
+
+            if (this.__ws) {
+                const fn = this.__ws.onopen || (() => { })
+                const p = new Promise((rs, rj) => {
+                    this.__ws.onopen = () => {
+                        fn(this.__ws)
+                        rs(this.__ws)
+                    }
+                })
+                return p
+            }
+            this.__uuid = uuidv4()
+            this.__ws = new WS(`ws://${this.host}:${this.port || 80}/websocket/${this.__uuid}`)
             this.__ws.onmessage = (e) => {
                 if (!isBrowser) {
                     this.__handleData(e.data)
@@ -1262,6 +1277,11 @@
                 };
                 reader.readAsArrayBuffer(e.data)
             }
+            const p = new Promise((rs, rj) => {
+                this.__ws.onopen = rs
+            }
+            )
+            return p
         }
 
         __handleData(data) {
@@ -1313,20 +1333,24 @@
          */
         listen(contract, event, func) {
             this.__tryConnect()
-            const id = ++this.__cid
-            const key = `${contract.address}:${event}`
-            this.__id2key.set(id, key)
-            const fn = (_, event, parameters) => {
-                const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
-                func(abiDecoded)
-            }
-            if (!this.__eventHandlers.has(key))
-                this.__eventHandlers.set(key, new Set())
+                .then(() => {
+                    assert(contract.address, 'missing contract.address')
+                    const addr = decodeHex(contract.address)
+                    this.__subscribe(1, addr)
+                    const id = ++this.__cid
+                    const key = `${contract.address}:${event}`
+                    this.__id2key.set(id, key)
+                    const fn = (_, event, parameters) => {
+                        const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
+                        func(abiDecoded)
+                    }
+                    if (!this.__eventHandlers.has(key))
+                        this.__eventHandlers.set(key, new Set())
 
-            this.__eventHandlers.get(key).add(id)
-            this.__callbacks.set(id, fn)
-
-            return id
+                    this.__eventHandlers.get(key).add(id)
+                    this.__callbacks.set(id, fn)
+                    return id
+                })
         }
 
 
@@ -1351,7 +1375,6 @@
         }
 
         listenOnce(contract, event, func) {
-            this.__tryConnect()
             const id = this.__cid + 1
             this.listen(contract, event, (p) => {
                 func(p)
@@ -1367,6 +1390,9 @@
          */
         observe(hash, cb) {
             this.__tryConnect()
+                .then(() => {
+                    this.__subscribe(0, decodeHex(hash))
+                })
             const id = ++this.__cid
             if (isBytes(hash))
                 hash = encodeHex(hash)
@@ -1429,7 +1455,8 @@
          * @param { Transaction } tx 
          * @param { number } timeout 
          */
-        __observeTx(tx, timeout) {
+        __observeTx(tx, status, timeout) {
+            status = status || TX_STATUS.CONFIRMED
             return new Promise((resolve, reject) => {
                 let success = false
 
@@ -1450,6 +1477,8 @@
                         return
                     }
                     if (s === TX_STATUS.CONFIRMED) {
+                        if (status == TX_STATUS.INCLUDED)
+                            return
                         confirmed = true
                         if (included) {
                             success = true
@@ -1459,7 +1488,7 @@
                     }
                     if (s === TX_STATUS.INCLUDED) {
                         included = true
-                        ret = {                     
+                        ret = {
                             blockHeight: d.blockHeight,
                             blockHash: d.blockHash,
                             gasUsed: d.gasUsed,
@@ -1476,21 +1505,27 @@
                             d.events.length
                             && tx.__abi) {
                             const events = []
-                            for(let e of d.events){
+                            for (let e of d.events) {
                                 const name = bin2str(e[0])
                                 const decoded = (new Contract('', tx.__abi)).abiDecode(name, e[1], ABI_TYPE.EVENT)
-                                events.push({name: name, data: decoded})
+                                events.push({ name: name, data: decoded })
                             }
                             ret.events = events
                         }
 
                         ret.transactionHash = tx.getHash()
                         ret.fee = toSafeInt((new BN(tx.gasPrice).mul(new BN(ret.gasUsed))))
-                        if(tx.isDeployOrCall()){
+                        if (tx.isDeployOrCall()) {
                             ret.method = tx.getMethod()
                             ret.inputs = tx.__inputs
                         }
-               
+
+                        if (status == TX_STATUS.INCLUDED) {
+                            success = true
+                            resolve(ret)
+                            return
+                        }
+
                         if (confirmed) {
                             success = true
                             resolve(ret)
@@ -1501,23 +1536,37 @@
             })
         }
 
+        __subscribe(code, key) {
+            return this.__tryConnect()
+                .then((b) => {
+                    if (!b)
+                        return
+                    this.__ws.send(RLP.encode([code, key]))
+                })
+        }
+
         /**
          * 发送事务的同时监听事务的状态
          * @param { Transaction | Array<Transaction> } tx 
          * @returns { Promise<Transaction> } 
          */
-        sendAndObserve(tx, timeout) {
+        sendAndObserve(tx, status, timeout) {
             let ret
+            let p
             if (Array.isArray(tx)) {
+                p = []
                 const arr = []
                 for (const t of tx) {
-                    arr.push(this.__observeTx(t, timeout))
+                    arr.push(this.__observeTx(t, status, timeout))
+                    p.push(this.__subscribe(0, decodeHex(t.getHash())))
                 }
+                p = Promise.all(p)
                 ret = Promise.all(arr)
             } else {
-                ret = this.__observeTx(tx, timeout)
+                ret = this.__observeTx(tx, status, timeout)
+                p = this.__subscribe(0, decodeHex(tx.getHash()))
             }
-            this.sendTransaction(tx)
+            p.then(() => this.sendTransaction(tx))
             return ret
         }
 
@@ -2132,7 +2181,8 @@
         str2bin: str2bin,
         bin2str: bin2str,
         f64ToBytes: f64ToBytes,
-        bytesToF64: bytesToF64
+        bytesToF64: bytesToF64,
+        convert: convert
     }
 
     if (!isBrowser)
