@@ -274,6 +274,14 @@
         }
     }
 
+    function normalizeParams(params){
+        if(params === null || params === undefined)
+            return []
+        if(typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array || params instanceof BN)  
+            return [params]  
+        return params    
+    }
+
     /**
      * 
      * @param {Array<TypeDef>} outputs
@@ -1428,12 +1436,8 @@
             if (!contract instanceof Contract)
                 throw new Error('create a instanceof Contract by new tool.Contract(addr, abi)')
 
-            if (!parameters)
-                parameters = []
 
-            if (parameters instanceof Uint8Array || typeof parameters === 'string')
-                throw new Error('parameters should be an raw js object or array')
-
+            parameters = normalizeParams(parameters)
             const addr = contract.address
             const params = contract.abiEncode(method, parameters)
 
@@ -1721,8 +1725,8 @@
             if (!contract.abi)
                 throw new Error('missing contract abi')
 
-            if (!parameters)
-                parameters = []
+
+            parameters = normalizeParams(parameters)
             const inputs = parameters
 
             const binary = contract.binary
@@ -1755,11 +1759,8 @@
             if (!contract.address)
                 throw new Error('missing contract address')
 
-            if (!parameters)
-                parameters = []
+            parameters = normalizeParams(parameters)
             const inputs = parameters
-            if (parameters instanceof Uint8Array || typeof parameters === 'string')
-                throw new Error('parameters should be an raw js object or array')
 
             const addr = contract.address
             parameters = contract.abiEncode(method, parameters)
