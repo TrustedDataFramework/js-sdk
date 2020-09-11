@@ -202,7 +202,7 @@
                 || type === ABI_DATA_TYPE.BOOL
                 || type === ABI_DATA_TYPE.I64
                 || type === ABI_DATA_TYPE.F64,
-                `invalid abi type def type = ${type}`
+                `invalid abi type def name = ${name} type = ${type}`
             )
             this.type = type
             this.name = name
@@ -2118,6 +2118,10 @@
      */
     function privateKey2PublicKey(sk) {
         sk = bin2hex(sk)
+        if (!isHex(sk))
+            throw new Error('invalid hex string ' + sk)
+        if (sk.length / 2 != 32)
+            throw new Error('invalid private key, length = ' + sk.length / 2)
         return sm2.compress(sm2.getPKFromSK(sk))
     }
 
@@ -2131,7 +2135,8 @@
             pk = toU8Arr(pk)
         if (typeof pk === 'string')
             pk = decodeHex(pk)
-
+        if (pk.length != 33)
+            throw new Error('invalid public key size: ' + pk.length)
         const buf = decodeHex(sm3(pk))
         return encodeHex(buf.slice(buf.length - 20, buf.length))
     }
@@ -2182,7 +2187,9 @@
         bin2str: bin2str,
         f64ToBytes: f64ToBytes,
         bytesToF64: bytesToF64,
-        convert: convert
+        convert: convert,
+        compileABI: compileABI,
+        ABI: ABI
     }
 
     if (!isBrowser)
@@ -2276,6 +2283,91 @@
             return v.toString(16);
         });
     }
+
+    /**
+     * 
+     * @param { ArrayBuffer | Uint8Array | string } str 
+     */
+    function compileABI(str) {
+        if (isBytes(str))
+            str = bin2str(str)
+        const TYPES = {
+            u64: 'u64',
+            i64: 'i64',
+            f64: 'f64',
+            bool: 'bool',
+            string: 'string',
+            ArrayBuffer: 'bytes',
+            Address: 'address',
+            U256: 'u256',
+            String: 'string',
+            boolean: 'bool'
+        }
+
+        function getOutputs(str) {
+            if (str === 'void')
+                return []
+            const ret = TYPES[str]
+            if (!ret)
+                throw new Error(`invalid type: ${str}`)
+            return [{ "type": ret }]
+        }
+
+        function getInputs(str, event) {
+            const ret = []
+            for (let p of str.split(',')) {
+                if (!p)
+                    continue
+                const lr = p.split(':')
+                let l = lr[0].trim()
+                if (event) {
+                    if (!l.startsWith('readonly'))
+                        throw new Error(`event constructor field ${l} should starts with readonly`)
+                    l = l.split(' ')[1]
+                }
+                const r = lr[1].trim()
+                const o = {
+                    name: l,
+                    type: TYPES[r]
+                }
+                if (!o.type)
+                    throw new Error(`invalid type: ${r}`)
+                ret.push(o)
+            }
+            return ret
+        }
+
+        const ret = []
+        let funRe = /export[\s\n\t]+function[\s\n\t]+([a-zA-Z_][a-zA-Z0-9_]*)[\s\n\t]*\(([a-z\n\s\tA-Z0-9_,:]*)\)[\s\n\t]*:[\s\n\t]*([a-zA-Z_][a-zA-Z0-9_]*)[\s\n\t]*{/g
+        let eventRe = /@unmanaged[\s\n\t]+class[\s\n\t]+([a-zA-Z_][a-zA-Z0-9]*)[\s\n\t]*\{[\s\n\t]*constructor[\s\n\t]*\(([a-z\n\s\tA-Z0-9_,:]*)\)/g
+
+        for (let m of str.match(funRe)) {
+            funRe.lastIndex = 0
+            const r = funRe.exec(m)
+            if (r[1] === '__idof')
+                continue
+            ret.push({
+                type: 'function',
+                name: r[1],
+                inputs: getInputs(r[2]),
+                outputs: getOutputs(r[3])
+            })
+        }
+
+
+        for (let m of str.match(eventRe)) {
+            eventRe.lastIndex = 0
+            const r = eventRe.exec(m)
+            ret.push({
+                type: 'event',
+                name: r[1],
+                inputs: [],
+                outputs: getInputs(r[2], true)
+            })
+        }
+        return ret
+    }
+
 
     /**
      * 认证服务器
