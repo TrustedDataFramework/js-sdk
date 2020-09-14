@@ -274,12 +274,12 @@
         }
     }
 
-    function normalizeParams(params){
-        if(params === null || params === undefined)
+    function normalizeParams(params) {
+        if (params === null || params === undefined)
             return []
-        if(typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array || params instanceof BN)  
-            return [params]  
-        return params    
+        if (typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array || params instanceof BN)
+            return [params]
+        return params
     }
 
     /**
@@ -1234,6 +1234,13 @@
         }
     }
 
+    const WS_CODES = {
+        NULL: 0,
+        EVENT_EMIT: 1,
+        EVENT_SUBSCRIBE: 2,
+        TRANSACTION_EMIT: 3,
+        TRANSACTION_SUBSCRIBE: 4
+    }
 
     class RPC {
 
@@ -1252,6 +1259,8 @@
             this.__eventHandlers = new Map() // address:event -> [id]
             this.__txObservers = new Map() // hash -> [id]
             this.__cid = 0
+            this.__ws_cb = new Map() // nonce -> cb
+            this.__nonce = 0
         }
 
         __tryConnect() {
@@ -1294,16 +1303,19 @@
 
         __handleData(data) {
             const decoded = RLP.decode(data)
-            const i = new BN(decoded[0], 'be')
-            switch (i.toString(10)) {
-                case '0': {
-                    const h = encodeHex(decoded[1])
-                    const s = (new BN(decoded[2], 'be')).toNumber()
+            const nonce = byteArrayToInt(decoded[0])
+            const code = byteArrayToInt(decoded[1])
+            const body = decoded[2]
+
+            switch (code) {
+                case WS_CODES.TRANSACTION_EMIT: {
+                    const h = encodeHex(body[0])
+                    const s = byteArrayToInt(body[1])
                     let d = null
                     if (s === TX_STATUS.DROPPED)
-                        d = bin2str(decoded[3])
+                        d = bin2str(body[2])
                     if (s === TX_STATUS.INCLUDED) {
-                        const arr = decoded[3]
+                        const arr = body[2]
                         d = {
                             blockHeight: toSafeInt(arr[0]),
                             blockHash: encodeHex(arr[1]),
@@ -1317,18 +1329,25 @@
                         const func = this.__callbacks.get(funcId)
                         func(h, s, d)
                     }
-                    break
+                    return
                 }
-                case '1': {
-                    const addr = encodeHex(decoded[1])
-                    const event = bin2str(decoded[2])
+                case WS_CODES.EVENT_EMIT: {
+                    const addr = encodeHex(body[0])
+                    const event = bin2str(body[1])
                     const funcIds = this.__eventHandlers.get(`${addr}:${event}`) || []
                     for (const funcId of funcIds) {
                         const func = this.__callbacks.get(funcId)
-                        func(addr, event, decoded[3])
+                        func(addr, event, body[2])
                     }
-                    break
+                    return
                 }
+            }
+
+            if (nonce) {
+                const fn = this.__ws_cb.get(nonce)
+                if (fn)
+                    fn(body)
+                this.__ws_cb.delete(nonce)
             }
         }
 
@@ -1344,7 +1363,7 @@
                 .then(() => {
                     assert(contract.address, 'missing contract.address')
                     const addr = decodeHex(contract.address)
-                    this.__subscribe(1, addr)
+                    this.__subscribe(WS_CODES.EVENT_SUBSCRIBE, addr)
                     const id = ++this.__cid
                     const key = `${contract.address}:${event}`
                     this.__id2key.set(id, key)
@@ -1399,7 +1418,7 @@
         observe(hash, cb) {
             this.__tryConnect()
                 .then(() => {
-                    this.__subscribe(0, decodeHex(hash))
+                    this.__subscribe(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(hash))
                 })
             const id = ++this.__cid
             if (isBytes(hash))
@@ -1541,11 +1560,15 @@
         }
 
         __subscribe(code, key) {
+            this.__nonce++
+            const n = this.__nonce
+            const ret = new Promise((rs, rj) => {
+                this.__ws_cb.set(n, rs)
+            })
             return this.__tryConnect()
-                .then((b) => {
-                    if (!b)
-                        return
-                    this.__ws.send(RLP.encode([code, key]))
+                .then(() => {
+                    this.__ws.send(RLP.encode([n, code, key]))
+                    return ret
                 })
         }
 
@@ -1562,13 +1585,13 @@
                 const arr = []
                 for (const t of tx) {
                     arr.push(this.__observeTx(t, status, timeout))
-                    p.push(this.__subscribe(0, decodeHex(t.getHash())))
+                    p.push(this.__subscribe(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(t.getHash())))
                 }
                 p = Promise.all(p)
                 ret = Promise.all(arr)
             } else {
                 ret = this.__observeTx(tx, status, timeout)
-                p = this.__subscribe(0, decodeHex(tx.getHash()))
+                p = this.__subscribe(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(tx.getHash()))
             }
             p.then(() => this.sendTransaction(tx))
             return ret
