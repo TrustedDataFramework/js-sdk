@@ -155,7 +155,7 @@
 
     /**
      * convert bytes like objects to hex string 十六进制编码
-     * @param {string | ArrayBuffer | Uint8Array } s 
+     * @param {string | ArrayBuffer | Uint8Array } s
      * @returns {string}
      */
     function bin2hex(s) {
@@ -283,9 +283,9 @@
     }
 
     /**
-     * 
+     *
      * @param {Array<TypeDef>} outputs
-     * @param {string | ArrayBuffer | Array<Uint8Array> | Uint8Array} buf 
+     * @param {string | ArrayBuffer | Array<Uint8Array> | Uint8Array} buf
      */
     function abiDecode(outputs, buf) {
         if (!buf)
@@ -374,7 +374,7 @@
          * @param {string | Uint8Array | ArrayBuffer } [payload]
          * @param {string | Uint8Array | ArrayBuffer} [to]
          * @param {string | Uint8Array | ArrayBuffer } [signature]
-         * @param { Array<ABI> } [__abi] abi 
+         * @param { Array<ABI> } [__abi] abi
          * @param { Array | Object } [__inputs] inputs
          */
         constructor(version, type, createdAt, nonce, from, gasLimit, gasPrice, amount, payload, to, signature, __abi, __inputs) {
@@ -418,7 +418,17 @@
          * @returns { Uint8Array }
          */
         getSignaturePlain() {
-            const arr = [
+            return RLP.encode(this.__toArr())
+        }
+
+        getEncoded() {
+            const arr = this.__toArr()
+            arr.push(convert(this.signature || EMPTY_BYTES, ABI_DATA_TYPE.BYTES))
+            return RLP.encode(arr)
+        }
+
+        __toArr() {
+            return [
                 convert(this.version || 0, ABI_DATA_TYPE.U64),
                 convert(this.type || 0, ABI_DATA_TYPE.U64),
                 convert(this.createdAt || '0', ABI_DATA_TYPE.U64),
@@ -430,7 +440,6 @@
                 convert(this.payload || EMPTY_BYTES, ABI_DATA_TYPE.BYTES),
                 convert(this.to || EMPTY_BYTES, ABI_DATA_TYPE.ADDRESS)
             ]
-            return RLP.encode(arr)
         }
 
         __setInputs(__inputs) {
@@ -604,7 +613,7 @@
 
     /**
      * 浮点数转字节数组
-     * @param {Uint8Array} arr 
+     * @param {Uint8Array} arr
      */
     function f64ToBytes(f) {
         let buf = new ArrayBuffer(8);
@@ -616,7 +625,7 @@
 
     /**
      * 字节数组转浮点数
-     * @param {Uint8Array} buf 
+     * @param {Uint8Array} buf
      */
     function bytesToF64(buf) {
         return new Float64Array(padPrefix(reverse(buf), 0, 8).buffer)[0]
@@ -625,7 +634,7 @@
 
     /**
      * 对字节数组取反
-     * @param {Uint8Array} arr 
+     * @param {Uint8Array} arr
      */
     function inverse(arr) {
         const ret = new Uint8Array(arr.length)
@@ -808,9 +817,12 @@
 
         /**
          *
-         * @param { Uint8Array | string | Array | ArrayBuffer | number | BN | null} o
+         * @param { Uint8Array | string | Array | ArrayBuffer | number | BN | null | Transaction} o
          */
         static encode(o) {
+            if (o && o.getEncoded) {
+                return o.getEncoded()
+            }
             if (o === null || o === undefined)
                 return NULL_RLP
             if (o instanceof ArrayBuffer)
@@ -821,13 +833,15 @@
                 assert(o >= 0 && Number.isInteger(o), `${o} is not a valid non-negative integer`)
                 return RLP.encodeBytes(numberToByteArray(o))
             }
+            if (typeof o === 'boolean')
+                return o ? new Uint8Array([0x01]) : NULL_RLP
             if (o instanceof BN) {
                 return RLP.encodeBytes(trimLeadingZeros(o.toArrayLike(Uint8Array, 'be')))
             }
             if (o instanceof Uint8Array)
                 return RLP.encodeBytes(o)
             if (Array.isArray(o)) {
-                const elements = o.map(RLP.encode)
+                const elements = o.map(x => RLP.encode(x))
                 return encodeElements(elements)
             }
         }
@@ -1148,7 +1162,7 @@
          *
          * @param {string} name 调用方法名称
          * @param { Array | Object } li 参数列表
-         * @returns { Array } rlp 编码后的参数
+         * @returns { Array } rlp 编码后的参数 
          */
         abiEncode(name, li) {
             const func = this.getABI(name, ABI_TYPE.FUNCTION)
@@ -1222,9 +1236,9 @@
         }
 
         /**
-         * 
-         * @param {string} name 
-         * @param {string} type 
+         *
+         * @param {string} name
+         * @param {string} type
          * @returns {ABI}
          */
         getABI(name, type) {
@@ -1239,7 +1253,10 @@
         EVENT_EMIT: 1,
         EVENT_SUBSCRIBE: 2,
         TRANSACTION_EMIT: 3,
-        TRANSACTION_SUBSCRIBE: 4
+        TRANSACTION_SUBSCRIBE: 4,
+        TRANSACTION_SEND: 5,
+        ACCOUNT_QUERY: 6,
+        CONTRACT_QUERY: 7
     }
 
     class RPC {
@@ -1259,7 +1276,7 @@
             this.__eventHandlers = new Map() // address:event -> [id]
             this.__txObservers = new Map() // hash -> [id]
             this.__cid = 0
-            this.__ws_cb = new Map() // nonce -> cb
+            this.__rpcCallbacks = new Map() // nonce -> cb
             this.__nonce = 0
         }
 
@@ -1270,7 +1287,8 @@
             }
 
             if (this.__ws) {
-                const fn = this.__ws.onopen || (() => { })
+                const fn = this.__ws.onopen || (() => {
+                })
                 const p = new Promise((rs, rj) => {
                     this.__ws.onopen = () => {
                         fn(this.__ws)
@@ -1281,6 +1299,7 @@
             }
             this.__uuid = uuidv4()
             this.__ws = new WS(`ws://${this.host}:${this.port || 80}/websocket/${this.__uuid}`)
+            this.__ws.onerror = console.error
             this.__ws.onmessage = (e) => {
                 if (!isBrowser) {
                     this.__handleData(e.data)
@@ -1344,10 +1363,10 @@
             }
 
             if (nonce) {
-                const fn = this.__ws_cb.get(nonce)
+                const fn = this.__rpcCallbacks.get(nonce)
                 if (fn)
                     fn(body)
-                this.__ws_cb.delete(nonce)
+                this.__rpcCallbacks.delete(nonce)
             }
         }
 
@@ -1363,7 +1382,7 @@
                 .then(() => {
                     assert(contract.address, 'missing contract.address')
                     const addr = decodeHex(contract.address)
-                    this.__subscribe(WS_CODES.EVENT_SUBSCRIBE, addr)
+                    this.__wsRpc(WS_CODES.EVENT_SUBSCRIBE, addr)
                     const id = ++this.__cid
                     const key = `${contract.address}:${event}`
                     this.__id2key.set(id, key)
@@ -1411,15 +1430,11 @@
 
         /**
          * 添加事务观察者，如果事务最终被确认或者异常终止，观察者会被移除
-         * @param {string | Uint8Array | ArrayBuffer} hash 
+         * @param {string | Uint8Array | ArrayBuffer} hash
          * @param { Function } cb  (hash, status, msg)
          * @returns {number}
          */
         observe(hash, cb) {
-            this.__tryConnect()
-                .then(() => {
-                    this.__subscribe(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(hash))
-                })
             const id = ++this.__cid
             if (isBytes(hash))
                 hash = encodeHex(hash)
@@ -1455,28 +1470,30 @@
             if (!contract instanceof Contract)
                 throw new Error('create a instanceof Contract by new tool.Contract(addr, abi)')
 
-
             parameters = normalizeParams(parameters)
             const addr = contract.address
             const params = contract.abiEncode(method, parameters)
 
-            return viewContract(this.host, this.port, addr, method, params)
-                .then(r => contract.abiDecode(method, r))
+            return this.__wsRpc(WS_CODES.CONTRACT_QUERY, [
+                decodeHex(addr),
+                method,
+                params
+            ]).then(r => contract.abiDecode(method, r))
         }
 
         /**
          * 发送事务
-         * @param tx {Object | Array}事务
+         * @param tx {Transaction | Array<Transaction> }事务
          * @returns {Promise<Object>}
          */
         sendTransaction(tx) {
-            return sendTransaction(this.host, this.port, tx)
+            return this.__wsRpc(WS_CODES.TRANSACTION_SEND, [Array.isArray(tx), tx])
         }
 
         /**
-         * 
-         * @param { Transaction } tx 
-         * @param { number } timeout 
+         *
+         * @param { Transaction } tx
+         * @param { number } timeout
          */
         __observeTx(tx, status, timeout) {
             status = status || TX_STATUS.CONFIRMED
@@ -1559,41 +1576,43 @@
             })
         }
 
-        __subscribe(code, key) {
+        __wsRpc(code, data) {
             this.__nonce++
             const n = this.__nonce
             const ret = new Promise((rs, rj) => {
-                this.__ws_cb.set(n, rs)
+                this.__rpcCallbacks.set(n, rs)
             })
-            return this.__tryConnect()
+            this.__tryConnect()
                 .then(() => {
-                    this.__ws.send(RLP.encode([n, code, key]))
-                    return ret
+                    const encoded = RLP.encode([n, code, data])
+                    this.__ws.send(encoded)
                 })
+            return ret
         }
 
         /**
          * 发送事务的同时监听事务的状态
-         * @param { Transaction | Array<Transaction> } tx 
-         * @returns { Promise<Transaction> } 
+         * @param { Transaction | Array<Transaction> } tx
+         * @returns { Promise<Transaction> }
          */
         sendAndObserve(tx, status, timeout) {
             let ret
             let p
+            let sub
             if (Array.isArray(tx)) {
                 p = []
                 const arr = []
+                sub = this.__wsRpc(WS_CODES.TRANSACTION_SUBSCRIBE, tx.map(t => decodeHex(t.getHash())))
                 for (const t of tx) {
                     arr.push(this.__observeTx(t, status, timeout))
-                    p.push(this.__subscribe(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(t.getHash())))
                 }
                 p = Promise.all(p)
                 ret = Promise.all(arr)
             } else {
+                sub = this.__wsRpc(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(tx.getHash()))
                 ret = this.__observeTx(tx, status, timeout)
-                p = this.__subscribe(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(tx.getHash()))
             }
-            p.then(() => this.sendTransaction(tx))
+            sub.then(() => this.sendTransaction(tx))
             return ret
         }
 
@@ -1630,7 +1649,22 @@
          * @returns {Promise<Object>}
          */
         getAccount(pkOrAddress) {
-            return getAccount(this.host, this.port, pkOrAddress)
+            let d = decodeHex(pkOrAddress)
+            if (d.length != 20)
+                d = decodeHex(publicKey2Address(d))
+            return this.__wsRpc(WS_CODES.ACCOUNT_QUERY, d)
+                .then(resp => {
+                    const decoded = resp
+                    const a = {
+                        address: encodeHex(decoded[0]),
+                        nonce: toSafeInt(decoded[1]),
+                        balance: toSafeInt(decoded[2]),
+                        createdBy: encodeHex(decoded[3]),
+                        contractHash: encodeHex(decoded[4]),
+                        storageRoot: encodeHex(decoded[5])
+                    }
+                    return a
+                })
         }
 
         /**
@@ -1641,7 +1675,6 @@
         getNonce(pkOrAddress) {
             return this.getAccount(pkOrAddress)
                 .then(a => a.nonce)
-                .then(toSafeInt)
         }
 
         /**
@@ -2309,8 +2342,8 @@
     }
 
     /**
-     * 
-     * @param { ArrayBuffer | Uint8Array | string } str 
+     *
+     * @param { ArrayBuffer | Uint8Array | string } str
      */
     function compileABI(str) {
         if (isBytes(str))
