@@ -153,7 +153,7 @@ builder.sign(tx)
 const tx = builder.buildAuthApprove(constants.PEER_AUTHENTICATION_ADDR, '***同意的地址***')
 ```
 
-### 构造 POA 退出事务并且签名
+### 构造 POA 退出事务
 
 ```js
 const tx = builder.buildAuthExit(constants.PEER_AUTHENTICATION_ADDR)
@@ -366,7 +366,7 @@ let tx = builder.buildDeploy(contract, {
 }, 0)
 ```
 
-### 构造合约调用事务并且签名
+### 构造合约调用事务
 
 ```js
 const abi = require('./coin.abi.json') // abi 文件
