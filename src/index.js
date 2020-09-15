@@ -1573,7 +1573,7 @@
 
                         ret.transactionHash = tx.getHash()
                         ret.fee = toSafeInt((new BN(tx.gasPrice).mul(new BN(ret.gasUsed))))
-                        if (tx.isDeployOrCall()) {
+                        if (tx.isDeployOrCall() && !tx.isBuiltInCall()) {
                             ret.method = tx.getMethod()
                             ret.inputs = tx.__inputs
                         }
