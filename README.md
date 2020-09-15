@@ -346,11 +346,11 @@ export function transfer(to: Address, amount: U256): void {
 ### 构造合约部署事务
 
 ```js
-const contract = new tool.Contract()
+const contract = new tdsSDK.Contract()
 // 编译合约得到字节码
-contract.binary = await tool.compileContract(ascPath, 'assembly/coin.ts')
+contract.binary = await tdsSDK.compileContract(ascPath, 'assembly/coin.ts')
 // 得到 abi
-contract.abi = tool.compileABI(fs.readFileSync('assembly/coin.ts'))
+contract.abi = tdsSDK.compileABI(fs.readFileSync('assembly/coin.ts'))
 // 写入 abi 文件
 fs.writeFilesSync('coin.abi.json', JSON.stringify(contract.abi))
 // 获取 nonce 
@@ -370,7 +370,7 @@ let tx = builder.buildDeploy(contract, {
 
 ```js
 const abi = require('./coin.abi.json') // abi 文件
-const contract = new tool.Contract('****address****', abi)
+const contract = new tdsSDK.Contract('****address****', abi)
 const tx = builder.buildContractCall(contract, 'transfer', ['****address****', 100000000], 0)
 ```
 
@@ -378,7 +378,7 @@ const tx = builder.buildContractCall(contract, 'transfer', ['****address****', 1
 
 ```js
 const abi = require('./coin.abi.json') // abi 文件
-const contract = new tool.Contract('****address****', abi)
+const contract = new tdsSDK.Contract('****address****', abi)
 rpc.viewContract(contract, 'balanceOf', ['****address****'])
     .then(console.log)
 ```
