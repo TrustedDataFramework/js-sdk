@@ -421,6 +421,10 @@
             return RLP.encode(this.__toArr())
         }
 
+        /**
+         * rlp 编码结果
+         * @returns { Uint8Array }
+         */
         getEncoded() {
             const arr = this.__toArr()
             arr.push(convert(this.signature || EMPTY_BYTES, ABI_DATA_TYPE.BYTES))
@@ -1377,28 +1381,33 @@
          * @param {Function} func 合约事件回调 {name: event, data: data}
          * @returns {number} 监听器的 id
          */
-        listen(contract, event, func) {
-            this.__tryConnect()
-                .then(() => {
-                    assert(contract.address, 'missing contract.address')
-                    const addr = decodeHex(contract.address)
-                    this.__wsRpc(WS_CODES.EVENT_SUBSCRIBE, addr)
-                    const id = ++this.__cid
-                    const key = `${contract.address}:${event}`
-                    this.__id2key.set(id, key)
-                    const fn = (_, event, parameters) => {
-                        const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
-                        func(abiDecoded)
-                    }
-                    if (!this.__eventHandlers.has(key))
-                        this.__eventHandlers.set(key, new Set())
+        __listen(contract, event, func) {
+            const addr = decodeHex(contract.address)
+            this.__wsRpc(WS_CODES.EVENT_SUBSCRIBE, addr)
+            const id = ++this.__cid
+            const key = `${contract.address}:${event}`
+            this.__id2key.set(id, key)
+            const fn = (_, event, parameters) => {
+                const abiDecoded = contract.abiDecode(event, parameters, ABI_TYPE.EVENT)
+                func(abiDecoded)
+            }
+            if (!this.__eventHandlers.has(key))
+                this.__eventHandlers.set(key, new Set())
 
-                    this.__eventHandlers.get(key).add(id)
-                    this.__callbacks.set(id, fn)
-                    return id
-                })
+            this.__eventHandlers.get(key).add(id)
+            this.__callbacks.set(id, fn)
+            return id
         }
 
+        listen(contract, event, func) {
+            if (func === undefined) {
+                return new Promise((rs, rj) => {
+                    this.__listen(contract, event, rs)
+                })
+            }
+            assert(typeof func === 'function', 'callback should be function')
+            this.__listen(contract, event, func)
+        }
 
         /**
          * 移除监听器
@@ -1413,16 +1422,25 @@
             if (key) {
                 const set = this.__eventHandlers.get(key)
                 set && set.delete(id)
+                if (set && set.size === 0)
+                    this.__eventHandlers.delete(key)
             }
             if (h) {
                 const set = this.__txObservers.get(h)
                 set && set.delete(id)
+                if (set && set.size === 0)
+                    this.__txObservers.delete(h)
             }
         }
 
         listenOnce(contract, event, func) {
             const id = this.__cid + 1
-            this.listen(contract, event, (p) => {
+            if (func === undefined)
+                return this.listen(contract, event).then((r) => {
+                    this.removeListener(id)
+                    return r
+                })
+            return this.listen(contract, event, (p) => {
                 func(p)
                 this.removeListener(id)
             })
@@ -1434,7 +1452,7 @@
          * @param { Function } cb  (hash, status, msg)
          * @returns {number}
          */
-        observe(hash, cb) {
+        __observe(hash, cb) {
             const id = ++this.__cid
             if (isBytes(hash))
                 hash = encodeHex(hash)
@@ -1495,7 +1513,7 @@
          * @param { Transaction } tx
          * @param { number } timeout
          */
-        __observeTx(tx, status, timeout) {
+        observe(tx, status, timeout) {
             status = status || TX_STATUS.CONFIRMED
             return new Promise((resolve, reject) => {
                 let success = false
@@ -1510,7 +1528,7 @@
                 let confirmed = false
                 let included = false
 
-                this.observe(tx.getHash(), (h, s, d) => {
+                this.__observe(tx.getHash(), (h, s, d) => {
                     if (s === TX_STATUS.DROPPED) {
                         const e = { hash: h, reason: d }
                         reject(e)
@@ -1604,16 +1622,17 @@
                 const arr = []
                 sub = this.__wsRpc(WS_CODES.TRANSACTION_SUBSCRIBE, tx.map(t => decodeHex(t.getHash())))
                 for (const t of tx) {
-                    arr.push(this.__observeTx(t, status, timeout))
+                    arr.push(this.observe(t, status, timeout))
                 }
                 p = Promise.all(p)
                 ret = Promise.all(arr)
             } else {
                 sub = this.__wsRpc(WS_CODES.TRANSACTION_SUBSCRIBE, decodeHex(tx.getHash()))
-                ret = this.__observeTx(tx, status, timeout)
+                ret = this.observe(tx, status, timeout)
             }
-            sub.then(() => this.sendTransaction(tx))
-            return ret
+            return sub
+                .then(() => this.sendTransaction(tx))
+                .then(() => ret)
         }
 
         /**
