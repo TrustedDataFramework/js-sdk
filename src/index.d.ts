@@ -34,6 +34,11 @@ declare namespace tdsSDK {
 
 
     export class RPC {
+        /**
+         * 构造器
+         * @param host 主机名
+         * @param port 端口号
+         */
         constructor(host?: string, port?: string | number);
 
         /**
@@ -119,11 +124,11 @@ declare namespace tdsSDK {
          */
         buildTransfer(amount: Numeric, to: Binary): Transaction
 
-       /**
-         * 构造加入请求事务
-         * @param address 合约地址
-         * @returns { Transaction }
-         */
+        /**
+          * 构造加入请求事务
+          * @param address 合约地址
+          * @returns { Transaction }
+          */
         buildAuthJoin(address: Binary): Transaction;
 
         /**
@@ -137,7 +142,7 @@ declare namespace tdsSDK {
          * 构造退出事务
          * @param contractAddress 合约地址
          */
-        buildAuthExit(contractAddress: Binary) : Transaction;
+        buildAuthExit(contractAddress: Binary): Transaction;
 
         /**
          * 构造投票事务
@@ -216,7 +221,7 @@ declare namespace tdsSDK {
      * @param buf 公钥
      */
     export function publicKey2Address(buf: Binary): string;
-    
+
     /**
      * 编译生成 abi
      * @param src 源代码
@@ -268,11 +273,11 @@ declare namespace tdsSDK {
     export function generatePrivateKey(): string;
 }
 
-declare interface AuthServer{
+declare interface AuthServer {
     listen(port: number, fn: () => void);
 }
 
-declare interface KeyStore{
+declare interface KeyStore {
     publicKey: string,
     crypto: {
         cipher: string,
