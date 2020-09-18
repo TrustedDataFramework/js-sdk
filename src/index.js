@@ -400,7 +400,7 @@
             this.__inputs = __inputs
         }
 
-        static from(o) {
+        static clone(o) {
             return new Transaction(o.version, o.type, o.createdAt, o.nonce, o.from, o.gasLimit, o.gasPrice, o.amount, o.payload, o.to, o.signature)
         }
 
@@ -485,6 +485,10 @@
             return this.isDeployOrCall() &&
                 (this.to === constants.PEER_AUTHENTICATION_ADDR || this.to === constants.POA_AUTHENTICATION_ADDR
                     || this.to == constants.POS_CONTRACT_ADDR)
+        }
+
+        sign(sk){
+            sign(this, sk);
         }
     }
 
@@ -1934,10 +1938,10 @@
 
         /**
          * 对事务作出签名
-         * @param { Transaction }tx 事务
+         * @param sk
          */
-        sign(tx) {
-            sign(tx, this.sk)
+        sign(sk) {
+            sign(this, sk)
         }
     }
 
