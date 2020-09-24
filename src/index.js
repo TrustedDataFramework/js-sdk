@@ -2421,7 +2421,7 @@
         let funRe = /export[\s\n\t]+function[\s\n\t]+([a-zA-Z_][a-zA-Z0-9_]*)[\s\n\t]*\(([a-z\n\s\tA-Z0-9_,:]*)\)[\s\n\t]*:[\s\n\t]*([a-zA-Z_][a-zA-Z0-9_]*)[\s\n\t]*{/g
         let eventRe = /@unmanaged[\s\n\t]+class[\s\n\t]+([a-zA-Z_][a-zA-Z0-9]*)[\s\n\t]*\{[\s\n\t]*constructor[\s\n\t]*\(([a-z\n\s\tA-Z0-9_,:]*)\)/g
 
-        for (let m of str.match(funRe)) {
+        for (let m of (str.match(funRe) || [])) {
             funRe.lastIndex = 0
             const r = funRe.exec(m)
             if (r[1] === '__idof')
@@ -2435,7 +2435,7 @@
         }
 
 
-        for (let m of str.match(eventRe)) {
+        for (let m of (str.match(eventRe) || [])) {
             eventRe.lastIndex = 0
             const r = eventRe.exec(m)
             ret.push({

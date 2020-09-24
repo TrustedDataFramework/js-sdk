@@ -11,6 +11,20 @@ type Numeric = string | number | BN
 type Binary = string | Uint8Array | ArrayBuffer
 
 
+
+declare interface Constants{
+    POA_VERSION: 1634693120;
+    POW_VERSION: 7368567;
+    POS_VERSION: 7368563;
+    COINBASE: 0;
+    TRANSFER: 1;
+    DEPLOY: 2;
+    CONTRACT_CALL: 3;
+    PEER_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000003";
+    POA_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000004";
+    POS_CONTRACT_ADDR: "0000000000000000000000000000000000000005";
+}
+
 declare namespace tdsSDK {
     export enum TX_STATUS {
         PENDING,
@@ -19,19 +33,8 @@ declare namespace tdsSDK {
         DROPPED
     }
 
-    export const constants = {
-        POA_VERSION: 1634693120,
-        POW_VERSION: 7368567,
-        POS_VERSION: 7368563,
-        COINBASE: 0,
-        TRANSFER: 1,
-        DEPLOY: 2,
-        CONTRACT_CALL: 3,
-        PEER_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000003",
-        POA_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000004",
-        POS_CONTRACT_ADDR: "0000000000000000000000000000000000000005"
-    }
 
+    export const constants: Constants;
 
     export class RPC {
         /**
