@@ -1938,10 +1938,10 @@
 
         /**
          * 对事务作出签名
-         * @param sk
+         * @param tx
          */
-        sign(sk) {
-            sign(this, sk)
+        sign(tx) {
+            sign(tx, this.sk)
         }
     }
 
