@@ -466,9 +466,9 @@ export class RPC {
      * @param hash 事务哈希值
      * @returns {Promise<Object>}
      */
-    getTransaction(hash: string): Promise<Object> {
+    getTransaction(hash: string): Promise<Transaction> {
         const url = `http://${this.host}:${this.port}/rpc/transaction/${hash}`
-        return rpcGet(url)
+        return rpcGet(url).then(r => Transaction.clone(r))
     }
 
     /**

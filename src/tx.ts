@@ -6,7 +6,11 @@ import rlp = require('./rlp')
 import BN = require('./bn')
 import { Encoder } from "./rlp";
 import { ABI, Contract } from './contract'
-import Dict = NodeJS.Dict;
+import Dict = NodeJS.Dict
+
+// 2020-10-25T09:57:15+08:00
+const OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/.compile()
+
 
 export class Transaction implements Encoder {
     version: string
@@ -23,6 +27,14 @@ export class Transaction implements Encoder {
     __abi?: ABI[]
     __inputs?: Readable[] | Dict<Readable>
     constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: Binary, gasLimit?: Digital, gasPrice?: Digital, amount?: Digital, payload?: Binary, to?: Binary, signature?: Binary, __abi?: ABI[], __inputs?: Readable[] | Dict<Readable>) {
+        // @ts-ignore
+        if (typeof createdAt === 'string' && OFFSET_DATE.test(createdAt)) {
+            try {
+                createdAt = new Date(createdAt).valueOf() / 1000
+            } catch (ignored) {
+
+            }
+        }
         this.version = dig2str(version || 0)
         this.type = dig2str(type || 0)
         this.createdAt = dig2str(createdAt || 0)

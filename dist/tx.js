@@ -7,8 +7,18 @@ var constants_1 = require("./constants");
 var rlp = require("./rlp");
 var BN = require("./bn");
 var contract_1 = require("./contract");
+// 2020-10-25T09:57:15+08:00
+var OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/.compile();
 var Transaction = /** @class */ (function () {
     function Transaction(version, type, createdAt, nonce, from, gasLimit, gasPrice, amount, payload, to, signature, __abi, __inputs) {
+        // @ts-ignore
+        if (typeof createdAt === 'string' && OFFSET_DATE.test(createdAt)) {
+            try {
+                createdAt = new Date(createdAt).valueOf() / 1000;
+            }
+            catch (ignored) {
+            }
+        }
         this.version = utils_1.dig2str(version || 0);
         this.type = utils_1.dig2str(type || 0);
         this.createdAt = utils_1.dig2str(createdAt || 0);

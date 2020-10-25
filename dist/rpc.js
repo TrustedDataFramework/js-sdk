@@ -5,6 +5,7 @@ var utils_1 = require("./utils");
 var rlp = require("./rlp");
 var constants_1 = require("./constants");
 var contract_1 = require("./contract");
+var tx_1 = require("./tx");
 var BN = require("./bn");
 var WS_CODES;
 (function (WS_CODES) {
@@ -350,8 +351,8 @@ var RPC = /** @class */ (function () {
             p = [];
             var arr = [];
             sub = this.wsRPC(WS_CODES.TRANSACTION_SUBSCRIBE, tx.map(function (t) { return utils_1.hex2bin(t.getHash()); }));
-            for (var _i = 0, tx_1 = tx; _i < tx_1.length; _i++) {
-                var t = tx_1[_i];
+            for (var _i = 0, tx_2 = tx; _i < tx_2.length; _i++) {
+                var t = tx_2[_i];
                 arr.push(this.observe(t, status, timeout));
             }
             p = Promise.all(p);
@@ -390,7 +391,7 @@ var RPC = /** @class */ (function () {
      */
     RPC.prototype.getTransaction = function (hash) {
         var url = "http://" + this.host + ":" + this.port + "/rpc/transaction/" + hash;
-        return rpcGet(url);
+        return rpcGet(url).then(function (r) { return tx_1.Transaction.clone(r); });
     };
     /**
      * 查看账户

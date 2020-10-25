@@ -92,7 +92,7 @@ export declare class RPC {
      * @param hash 事务哈希值
      * @returns {Promise<Object>}
      */
-    getTransaction(hash: string): Promise<Object>;
+    getTransaction(hash: string): Promise<Transaction>;
     /**
      * 查看账户
      * @param pkOrAddress {string} 公钥或者地址
