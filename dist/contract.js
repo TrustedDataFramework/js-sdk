@@ -37,13 +37,6 @@ var TypeDef = /** @class */ (function () {
 }());
 exports.TypeDef = TypeDef;
 var ABI = /** @class */ (function () {
-    /**
-     *
-     * @param {string} name
-     * @param {string} type
-     * @param {Array<TypeDef> } inputs
-     * @param {Array<TypeDef>} outputs
-     */
     function ABI(name, type, inputs, outputs) {
         utils_1.assert(name, 'expect name of abi');
         utils_1.assert(type === 'function' || type === 'event', "invalid abi type " + type);
@@ -229,10 +222,6 @@ var Contract = /** @class */ (function () {
     return Contract;
 }());
 exports.Contract = Contract;
-/**
- *
- * @param { ArrayBuffer | Uint8Array | string } str
- */
 function compileABI(str) {
     var s = str instanceof Uint8Array || str instanceof ArrayBuffer ?
         utils_1.bin2str(str) : str;

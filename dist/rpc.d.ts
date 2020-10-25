@@ -69,8 +69,7 @@ export declare class RPC {
     viewContract(contract: Contract, method: string, parameters: any): Promise<Readable | Readable[] | Dict<Readable>>;
     /**
      * 发送事务
-     * @param tx {Transaction | Array<Transaction> }事务
-     * @returns {Promise<Object>}
+     * @param tx 事务
      */
     sendTransaction(tx: Transaction | Transaction[]): Promise<Resp>;
     observe(tx: Transaction, status?: TX_STATUS, timeout?: number): Promise<TransactionResult>;

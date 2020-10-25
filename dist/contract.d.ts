@@ -17,13 +17,6 @@ export declare class ABI {
     type: ABI_TYPE;
     inputs: TypeDef[];
     outputs: TypeDef[];
-    /**
-     *
-     * @param {string} name
-     * @param {string} type
-     * @param {Array<TypeDef> } inputs
-     * @param {Array<TypeDef>} outputs
-     */
     constructor(name: string, type: ABI_TYPE, inputs?: TypeDef[], outputs?: TypeDef[]);
     static from(o: any): ABI;
     returnsObj(): boolean;
@@ -36,17 +29,13 @@ export declare class Contract {
     address: string;
     abi: ABI[];
     binary: Uint8Array;
-    constructor(address?: string | Uint8Array | ArrayBuffer, abi?: any[], binary?: Uint8Array | ArrayBuffer);
+    constructor(address?: Binary, abi?: any[], binary?: Uint8Array | ArrayBuffer);
     abiEncode(name: string, li?: AbiInput | AbiInput[] | Dict<AbiInput>): [ABI_DATA_ENUM[], Array<string | Uint8Array | BN>, ABI_DATA_ENUM[]];
     abiDecode(name: string, buf?: Uint8Array[], type?: ABI_TYPE): Readable | Readable[] | Dict<Readable>;
     abiToBinary(): any[];
     getABI(name: string, type: ABI_TYPE): ABI;
 }
-/**
- *
- * @param { ArrayBuffer | Uint8Array | string } str
- */
-export declare function compileABI(str: ArrayBuffer | Uint8Array | string): ABI[];
+export declare function compileABI(str: Binary): ABI[];
 /**
  * 生成合约地址
  */

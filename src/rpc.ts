@@ -1,6 +1,6 @@
-import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeInt, uuidv4} from "./utils"
+import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeInt, uuidv4 } from "./utils"
 import rlp = require("./rlp")
-import {AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS} from "./constants";
+import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS } from "./constants";
 import { Contract, normalizeParams } from "./contract";
 import Dict = NodeJS.Dict;
 import { Transaction } from "./tx";
@@ -8,13 +8,13 @@ import BN = require('./bn')
 
 
 
-export interface TransactionResult{
+export interface TransactionResult {
     transactionHash?: string
     blockHeight?: number | string
     blockHash?: string
     gasUsed?: string | number
     events?: Readable[] | Dict<Readable>
-    result?: Readable 
+    result?: Readable
     fee?: string | number
     method?: string
     inputs?: AbiInput[] | Dict<AbiInput>
@@ -26,13 +26,13 @@ interface Resp {
     body: RLPElement | RLPElement[]
 }
 
-interface EventResp extends Resp{
+interface EventResp extends Resp {
     addr: string
     name: string
     fields: Uint8Array[]
 }
 
-interface TransactionResp extends Resp{
+interface TransactionResp extends Resp {
     hash: string
     status: TX_STATUS
     reason?: string
@@ -136,7 +136,7 @@ export class RPC {
         const decoded: RLPElement[] = <RLPElement[]>rlp.decode(data)
         const nonce = rlp.byteArrayToInt(<Uint8Array>decoded[0])
         const code = rlp.byteArrayToInt(<Uint8Array>decoded[1])
-        const body = <RLPElement | RLPElement[]> decoded[2]
+        const body = <RLPElement | RLPElement[]>decoded[2]
         switch (code) {
             case WS_CODES.TRANSACTION_EMIT: {
                 const ret: TransactionResp = {
@@ -164,7 +164,7 @@ export class RPC {
                     nonce: nonce,
                     addr: bin2hex(<Uint8Array>body[0]),
                     name: bin2str(<Uint8Array>body[1]),
-                    fields: <Uint8Array[]> (body[2]),
+                    fields: <Uint8Array[]>(body[2]),
                     body: body
                 }
                 return ret
@@ -221,7 +221,7 @@ export class RPC {
         this.id2key.set(id, key)
         const fn = (r: EventResp | TransactionResp) => {
             let resp = <EventResp>r
-            const abiDecoded = <Dict<Readable>> contract.abiDecode(resp.name, <Uint8Array[]>resp.fields, 'event')
+            const abiDecoded = <Dict<Readable>>contract.abiDecode(resp.name, <Uint8Array[]>resp.fields, 'event')
             func(abiDecoded)
         }
         if (!this.eventHandlers.has(key))
@@ -274,7 +274,7 @@ export class RPC {
     }
 
 
-    private __observe(h: string | Uint8Array | ArrayBuffer, cb: (r: TransactionResp) => void) {
+    private __observe(h: Binary, cb: (r: TransactionResp) => void) {
         const id = ++this.cid
         let hash = bin2hex(h)
 
@@ -310,20 +310,19 @@ export class RPC {
             hex2bin(addr),
             method,
             params
-        ]).then(r => contract.abiDecode(method, <Uint8Array[]> r.body))
+        ]).then(r => contract.abiDecode(method, <Uint8Array[]>r.body))
     }
 
     /**
      * 发送事务
-     * @param tx {Transaction | Array<Transaction> }事务
-     * @returns {Promise<Object>}
+     * @param tx 事务
      */
     sendTransaction(tx: Transaction | Transaction[]) {
         return this.wsRPC(WS_CODES.TRANSACTION_SEND, [Array.isArray(tx), tx])
     }
 
 
-    observe(tx: Transaction, status?: TX_STATUS, timeout?: number): Promise<TransactionResult>{
+    observe(tx: Transaction, status?: TX_STATUS, timeout?: number): Promise<TransactionResult> {
         status = status === undefined ? TX_STATUS.CONFIRMED : status
         return new Promise((resolve, reject) => {
             let success = false
@@ -365,7 +364,7 @@ export class RPC {
                         && tx.__abi
                         && tx.isDeployOrCall()
                         && (!tx.isBuiltInCall())) {
-                        const decoded = (new Contract('', tx.__abi)).abiDecode(tx.getMethod(), <Uint8Array[]> r.result)
+                        const decoded = (new Contract('', tx.__abi)).abiDecode(tx.getMethod(), <Uint8Array[]>r.result)
                         ret.result = <Readable>decoded
                     }
 
@@ -420,7 +419,7 @@ export class RPC {
     }
 
 
-    sendAndObserve(tx: Transaction | Transaction[], status?: TX_STATUS, timeout?: number): Promise<TransactionResult>{
+    sendAndObserve(tx: Transaction | Transaction[], status?: TX_STATUS, timeout?: number): Promise<TransactionResult> {
         let ret
         let p
         let sub
@@ -484,7 +483,7 @@ export class RPC {
             d = hex2bin(publicKey2Address(d))
         return this.wsRPC(WS_CODES.ACCOUNT_QUERY, d)
             .then(resp => {
-                const decoded = <Uint8Array[]> resp.body
+                const decoded = <Uint8Array[]>resp.body
                 const a = {
                     address: bin2hex(decoded[0]),
                     nonce: toSafeInt(decoded[1]),
@@ -523,8 +522,8 @@ export class RPC {
      * @param contractAddress 合约地址
      * @returns {Promise<[]>}
      */
-    getAuthNodes(contractAddress: Binary): Promise<string[]>{
-        return <Promise<string[]>> rpcPost(this.host, this.port, `/rpc/contract/${bin2hex(contractAddress)}`, {
+    getAuthNodes(contractAddress: Binary): Promise<string[]> {
+        return <Promise<string[]>>rpcPost(this.host, this.port, `/rpc/contract/${bin2hex(contractAddress)}`, {
             method: 'nodes'
         })
     }

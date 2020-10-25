@@ -19,20 +19,18 @@ var TransactionBuilder = /** @class */ (function () {
         this.nonce = n.add(constants_1.ONE).toString(10);
     };
     /**
-     * 创建转账事务（未签名）
+     * 创建转账事务
      * @param amount 转账金额
-     * @param to { string } 转账接收者
-     * @returns { Transaction }
+     * @param to 转账接收者
      */
     TransactionBuilder.prototype.buildTransfer = function (amount, to) {
         return this.buildCommon(constants_1.constants.TRANSFER, amount, '', to);
     };
     /**
-     * 构造部署合约的事务 （未签名）
-     * @param { Contract } contract 合约对象
-     * @param { Array | Object } [parameters] 合约的构造器参数
-     * @param amount [number]
-     * @returns { Transaction }
+     * 构造部署合约的事务
+     * @param contract 合约对象
+     * @param parameters 合约的构造器参数
+     * @param amount
      */
     TransactionBuilder.prototype.buildDeploy = function (contract, parameters, amount) {
         utils_1.assert(contract.binary && contract.binary instanceof Uint8Array, 'contract binary is not uint8 array');
@@ -48,11 +46,10 @@ var TransactionBuilder = /** @class */ (function () {
     };
     /**
      * 构造合约调用事务
-     * @param { Contract} contract 合约
-     * @param {string} method 调用合约的方法
-     * @param { Array | Object } [parameters] 方法参数
-     * @param amount [number] 金额
-     * @returns { Transaction }
+     * @param contract 合约
+     * @param method 调用合约的方法
+     * @param parameters 方法参数
+     * @param amount 金额
      */
     TransactionBuilder.prototype.buildContractCall = function (contract, method, parameters, amount) {
         if (!contract.abi)
@@ -68,11 +65,11 @@ var TransactionBuilder = /** @class */ (function () {
         return ret;
     };
     /**
-     * 创建事务（未签名）
-     * @param type {number | string | BN} 事务类型
-     * @param amount {number | BN | string} 金额
-     * @param payload {string | Uint8Array | ArrayBuffer}
-     * @param to {string | Uint8Array | ArrayBuffer } 接收者的地址
+     * 创建事务
+     * @param type 事务类型
+     * @param amount 金额
+     * @param payload
+     * @param to 接收者的地址
      * @returns { Transaction } 构造好的事务
      */
     TransactionBuilder.prototype.buildCommon = function (type, amount, payload, to) {
@@ -85,35 +82,33 @@ var TransactionBuilder = /** @class */ (function () {
         return ret;
     };
     /**
-     * 构造加入请求事务（未签名）
-     * @param address {string} 合约地址
-     * @returns { Transaction }
+     * 构造加入请求事务
+     * @param address 合约地址
      */
     TransactionBuilder.prototype.buildAuthJoin = function (address) {
         var payload = '00';
         return this.buildCommon(constants_1.constants.CONTRACT_CALL, 0, payload, address);
     };
     /**
-     * 构造同意加入的请求
-     * @param contractAddress {string} 合约地址
-     * @param approvedAddress {string} 同意加入的地址
-     * @returns { Transaction }
+     * 构造 Auth 同意加入的请求
+     * @param contractAddress 合约地址
+     * @param approvedAddress 同意加入的地址
      */
     TransactionBuilder.prototype.buildAuthApprove = function (contractAddress, approvedAddress) {
         var payload = '01' + utils_1.bin2hex(approvedAddress);
         return this.buildCommon(constants_1.constants.CONTRACT_CALL, 0, payload, contractAddress);
     };
     /**
-     * 构造退出事务（未签名）
+     * 构造 Auth 退出事务
      */
     TransactionBuilder.prototype.buildAuthExit = function (contractAddress) {
         var payload = '02' + utils_1.privateKey2PublicKey(this.sk);
         return this.buildCommon(constants_1.constants.CONTRACT_CALL, 0, payload, contractAddress);
     };
     /**
-     * 构造投票事务（未签名）
-     * @param amount {number} 投票数量
-     * @param to {string} 被投票者的地址
+     * 构造投票事务
+     * @param amount 投票数量
+     * @param to 被投票者的地址
      */
     TransactionBuilder.prototype.buildVote = function (amount, to) {
         var payload = '00' + to;

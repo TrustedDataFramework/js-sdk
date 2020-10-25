@@ -60,13 +60,7 @@ export class ABI {
     type: ABI_TYPE
     inputs: TypeDef[]
     outputs: TypeDef[]
-    /**
-     *
-     * @param {string} name
-     * @param {string} type
-     * @param {Array<TypeDef> } inputs
-     * @param {Array<TypeDef>} outputs
-     */
+
     constructor(name: string, type: ABI_TYPE, inputs?: TypeDef[], outputs?: TypeDef[]) {
         assert(name, 'expect name of abi')
         assert(type === 'function' || type === 'event', `invalid abi type ${type}`)
@@ -202,7 +196,7 @@ export class Contract {
     abi: ABI[]
     binary: Uint8Array
 
-    constructor(address?: string | Uint8Array | ArrayBuffer, abi?: any[], binary?: Uint8Array | ArrayBuffer) {
+    constructor(address?: Binary, abi?: any[], binary?: Uint8Array | ArrayBuffer) {
         if (address)
             this.address = bin2hex(address)
         if (abi)
@@ -286,11 +280,7 @@ export class Contract {
     }
 }
 
-/**
- *
- * @param { ArrayBuffer | Uint8Array | string } str
- */
-export function compileABI(str: ArrayBuffer | Uint8Array | string): ABI[] {
+export function compileABI(str: Binary): ABI[] {
     let s = str instanceof Uint8Array || str instanceof ArrayBuffer ?
         bin2str(str) : str
 

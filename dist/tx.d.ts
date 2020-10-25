@@ -19,7 +19,7 @@ export declare class Transaction implements Encoder {
     signature: string;
     __abi?: ABI[];
     __inputs?: Readable[] | Dict<Readable>;
-    constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: any, gasLimit?: any, gasPrice?: any, amount?: any, payload?: any, to?: any, signature?: any, __abi?: any, __inputs?: any);
+    constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: Binary, gasLimit?: Digital, gasPrice?: Digital, amount?: Digital, payload?: Binary, to?: Binary, signature?: Binary, __abi?: ABI[], __inputs?: Readable[] | Dict<Readable>);
     static clone(o?: any): Transaction;
     /**
      * 计算事务哈希值

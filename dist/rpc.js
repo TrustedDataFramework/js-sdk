@@ -246,8 +246,7 @@ var RPC = /** @class */ (function () {
     };
     /**
      * 发送事务
-     * @param tx {Transaction | Array<Transaction> }事务
-     * @returns {Promise<Object>}
+     * @param tx 事务
      */
     RPC.prototype.sendTransaction = function (tx) {
         return this.wsRPC(WS_CODES.TRANSACTION_SEND, [Array.isArray(tx), tx]);

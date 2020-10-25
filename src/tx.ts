@@ -1,7 +1,7 @@
-import {AbiInput, Binary, Digital} from './constants'
+import { AbiInput, Binary, Digital } from './constants'
 import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeInt } from "./utils";
 import { sm3, sm2 } from '@salaku/sm-crypto'
-import { constants, ABI_DATA_ENUM, Readable} from './constants'
+import { constants, ABI_DATA_ENUM, Readable } from './constants'
 import rlp = require('./rlp')
 import BN = require('./bn')
 import { Encoder } from "./rlp";
@@ -22,7 +22,7 @@ export class Transaction implements Encoder {
     signature: string
     __abi?: ABI[]
     __inputs?: Readable[] | Dict<Readable>
-    constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?, gasLimit?, gasPrice?, amount?, payload?, to?, signature?, __abi?, __inputs?) {
+    constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: Binary, gasLimit?: Digital, gasPrice?: Digital, amount?: Digital, payload?: Binary, to?: Binary, signature?: Binary, __abi?: ABI[], __inputs?: Readable[] | Dict<Readable>) {
         this.version = dig2str(version || 0)
         this.type = dig2str(type || 0)
         this.createdAt = dig2str(createdAt || 0)
@@ -34,10 +34,10 @@ export class Transaction implements Encoder {
         this.payload = bin2hex(payload || '')
         this.to = bin2hex(to || '')
         this.signature = bin2hex(signature || '')
-        
-        if(__abi)
+
+        if (__abi)
             this.__abi = __abi
-        if(__inputs)    
+        if (__inputs)
             this.__inputs = __inputs
     }
 
@@ -108,7 +108,7 @@ export class Transaction implements Encoder {
             const c = new Contract('', this.__abi)
             const a = c.getABI(this.getMethod(), 'function')
             if (a.inputsObj()) {
-                this.__inputs = <Dict<Readable>> a.toObj(this.__inputs, true)
+                this.__inputs = <Dict<Readable>>a.toObj(this.__inputs, true)
             }
         }
     }
