@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { AbiInput, Digital } from './constants';
+import { AbiInput, Binary, Digital } from './constants';
 import { Readable } from './constants';
 import BN = require('./bn');
 import { Encoder } from "./rlp";
@@ -38,5 +38,5 @@ export declare class Transaction implements Encoder {
     getMethod(): string;
     isDeployOrCall(): boolean;
     isBuiltInCall(): boolean;
-    sign(sk: string): void;
+    sign(sk: Binary): void;
 }

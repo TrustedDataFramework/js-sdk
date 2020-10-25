@@ -177,17 +177,6 @@ export function encodeElements(elements: Uint8Array[]): Uint8Array {
 }
 
 
-function concatBytes(x: Uint8Array, y: Uint8Array): Uint8Array {
-    const ret = new Uint8Array(x.length + y.length);
-    for (let i = 0; i < x.length; i++) {
-        ret[i] = x[i]
-    }
-    for (let i = 0; i < y.length; i++) {
-        ret[x.length + i] = y[i]
-    }
-    return ret
-}
-
 function copyOfRange(bytes: Uint8Array, from: number, to: number): Uint8Array {
     const ret = new Uint8Array(to - from);
     let j = 0;

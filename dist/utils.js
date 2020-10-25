@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uuidv4 = exports.toSafeInt = exports.convert = exports.bin2str = exports.bin2hex = exports.dig2str = exports.assert = exports.hex2bin = exports.trimLeadingZeros = exports.f64ToBytes = exports.inverse = exports.str2bin = exports.publicKey2Address = exports.privateKey2PublicKey = exports.padPrefix = exports.bytesToF64 = void 0;
+exports.createAuthServer = exports.readKeyStore = exports.createKeyStore = exports.concatBytes = exports.randomBytes = exports.generatePrivateKey = exports.sign = exports.uuidv4 = exports.toSafeInt = exports.convert = exports.bin2str = exports.bin2hex = exports.dig2str = exports.assert = exports.hex2bin = exports.trimLeadingZeros = exports.f64ToBytes = exports.inverse = exports.str2bin = exports.publicKey2Address = exports.privateKey2PublicKey = exports.padPrefix = exports.bytesToF64 = void 0;
 var constants_1 = require("./constants");
 var BN = require("./bn");
 var sm_crypto_1 = require("@salaku/sm-crypto");
+var tx_1 = require("./tx");
 function bytesToF64(buf) {
     return new Float64Array(padPrefix(reverse(buf), 0, 8).buffer)[0];
 }
@@ -32,7 +33,7 @@ function privateKey2PublicKey(sk) {
     var s = bin2hex(sk);
     if (s.length / 2 != 32)
         throw new Error('invalid private key, length = ' + s.length / 2);
-    return sm_crypto_1.sm2.compress(sm_crypto_1.sm2.getPKFromSK(sk));
+    return sm_crypto_1.sm2.compress(sm_crypto_1.sm2.getPKFromSK(s));
 }
 exports.privateKey2PublicKey = privateKey2PublicKey;
 /**
@@ -111,8 +112,6 @@ function hexToInt(x) {
 /**
  * 解析十六进制字符串
  * decode hex string
- * @param {string | ArrayBuffer | Uint8Array} s
- * @returns {Uint8Array}
  */
 function hex2bin(s) {
     if (s instanceof ArrayBuffer)
@@ -362,3 +361,119 @@ function uuidv4() {
     });
 }
 exports.uuidv4 = uuidv4;
+function sign(tx, sk) {
+    var t = tx_1.Transaction.clone(tx);
+    t.sign(sk);
+    tx.signature = t.signature;
+    return tx;
+}
+exports.sign = sign;
+/**
+ * 生成私钥
+ */
+function generatePrivateKey() {
+    return (sm_crypto_1.sm2.generateKeyPairHex()).privateKey;
+}
+exports.generatePrivateKey = generatePrivateKey;
+/**
+ * 随机生成字节数组 Uint8Array
+ */
+function randomBytes(length) {
+    if (typeof crypto === 'object') {
+        var ret = new Uint8Array(length);
+        window.crypto.getRandomValues(ret);
+        return ret;
+    }
+    var crypt = require('crypto');
+    return crypt.randomBytes(length);
+}
+exports.randomBytes = randomBytes;
+function concatBytes(x, y) {
+    var ret = new Uint8Array(x.length + y.length);
+    for (var i = 0; i < x.length; i++) {
+        ret[i] = x[i];
+    }
+    for (var i = 0; i < y.length; i++) {
+        ret[x.length + i] = y[i];
+    }
+    return ret;
+}
+exports.concatBytes = concatBytes;
+/**
+ * 生成 keystore
+ */
+function createKeyStore(password, privateKey) {
+    if (!privateKey)
+        privateKey = generatePrivateKey();
+    var _priv = hex2bin(privateKey);
+    var ret = {
+        publicKey: '',
+        crypto: {
+            cipher: "sm4-128-ecb",
+            cipherText: '',
+            iv: '',
+            salt: ''
+        },
+        id: '',
+        version: "1",
+        mac: "",
+        kdf: "sm2-kdf",
+        address: ''
+    };
+    var salt = randomBytes(32);
+    var iv = randomBytes(16);
+    ret.publicKey = privateKey2PublicKey(_priv);
+    ret.crypto.iv = bin2hex(iv);
+    ret.crypto.salt = bin2hex(salt);
+    ret.id = uuidv4();
+    var key = hex2bin(sm_crypto_1.sm3(concatBytes(salt, str2bin(password))));
+    key = key.slice(0, 16);
+    var cipherText = sm_crypto_1.sm4.encrypt(_priv, key);
+    cipherText = new Uint8Array(cipherText);
+    ret.crypto.cipherText = bin2hex(cipherText);
+    ret.mac = sm_crypto_1.sm3(concatBytes(key, cipherText));
+    ret.address = publicKey2Address(ret.publicKey);
+    return ret;
+}
+exports.createKeyStore = createKeyStore;
+function readKeyStore(ks, password) {
+    if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
+        throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
+    }
+    var buf = concatBytes(hex2bin(ks.crypto.salt), str2bin(password));
+    var key = sm_crypto_1.sm3(buf);
+    var cipherPrivKey = hex2bin(ks.crypto.cipherText);
+    var decrypted = sm_crypto_1.sm4.decrypt(cipherPrivKey, hex2bin(key));
+    return bin2hex(decrypted);
+}
+exports.readKeyStore = readKeyStore;
+/**
+ * 认证服务器
+ */
+function createAuthServer(privateKey, whiteList) {
+    var URL = require('url');
+    var http = require('http');
+    var server = http.createServer();
+    server.on('request', function (request, response) {
+        var otherPublicKey = URL.parse(request.url, true).query['publicKey'];
+        if (whiteList && whiteList.length) {
+            var exists = whiteList.map(function (x) { return bin2hex(x) === otherPublicKey; })
+                .reduce(function (x, y) { return x || y; }, false);
+            if (!exists)
+                throw new Error("invalid public key, not in white list " + otherPublicKey);
+        }
+        // 对公钥进行解压缩
+        if (otherPublicKey.substr(0, 2) !== '04') {
+            otherPublicKey = sm_crypto_1.sm2.deCompress(otherPublicKey);
+        }
+        // 生成密文
+        var ret = {
+            publicKey: privateKey2PublicKey(privateKey),
+            cipherText: sm_crypto_1.sm2.doEncrypt(hex2bin(privateKey), otherPublicKey, sm_crypto_1.sm2.C1C2C3)
+        };
+        response.write(JSON.stringify(ret));
+        response.end();
+    });
+    return server;
+}
+exports.createAuthServer = createAuthServer;

@@ -14,28 +14,13 @@ npm install --save @salaku/js-sdk
 ```js
 const tdsSDK = require('@salaku/js-sdk')
 console.log(tdsSDK.constants)
-/*
-constants 
-{
-  POA_VERSION: 1634693120,
-  POW_VERSION: 7368567,
-  POS_VERSION: 7368563,
-  COINBASE: 0,
-  TRANSFER: 1,
-  DEPLOY: 2,
-  CONTRACT_CALL: 3,
-  PEER_AUTHENTICATION_ADDR: '0000000000000000000000000000000000000003',
-  POA_AUTHENTICATION_ADDR: '0000000000000000000000000000000000000004',
-  POS_CONTRACT_ADDR: '0000000000000000000000000000000000000005'
-}
-*/
 ```
 
 ### 事务签名
 
 ```js
 const tdsSDK = require('@salaku/js-sdk')
-const tx = tdsSDK.Transaction.from({
+const tx = {
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,
@@ -45,9 +30,8 @@ const tx = tdsSDK.Transaction.from({
     "amount" : 20,
     "payload" : "02b507fe1afd0cc7a525488292beadbe9f143784de44f8bc1c991636509fd50936",
     "to" : "9cbf30db111483e4b84e77ca0e39378fd7605e1b",
-})
+}
 
-// 填入事务和私钥
 tdsSDK.sign(tx, 'f00df601a78147ffe0b84de1dffbebed2a6ea965becd5d0bd7faf54f1f29c6b5')
 console.log(tx.signature)
 ```
@@ -57,7 +41,7 @@ console.log(tx.signature)
 
 ```js
 const tdsSDK = require('@salaku/js-sdk')
-const tx = tdsSDK.Transaction.from({
+const tx = tdsSDK.Transaction.clone({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,
@@ -196,7 +180,7 @@ rpc.getNonce(pk)
 ### 发送事务（异步）
 
 ```js
-const tx = tdsSDK.Transaction.from({
+const tx = tdsSDK.Transaction.clone({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,
@@ -216,7 +200,7 @@ rpc.sendTransaction(tx)
 ### 发送事务并等待事务进入区块
 
 ```js
-const tx = tdsSDK.Transaction.from({
+const tx = tdsSDK.Transaction.clone({
     "version" : 1634693120,
     "type" : 0,
     "createdAt" : 1596091121,

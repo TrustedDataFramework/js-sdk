@@ -106,7 +106,7 @@ var Transaction = /** @class */ (function () {
     };
     Transaction.prototype.sign = function (sk) {
         this.signature =
-            sm_crypto_1.sm2.doSignature(this.getSignaturePlain(), sk, { userId: 'userid@soie-chain.com', der: false, hash: true });
+            sm_crypto_1.sm2.doSignature(this.getSignaturePlain(), utils_1.bin2hex(sk), { userId: 'userid@soie-chain.com', der: false, hash: true });
     };
     return Transaction;
 }());

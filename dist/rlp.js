@@ -160,16 +160,6 @@ function encodeElements(elements) {
     return data;
 }
 exports.encodeElements = encodeElements;
-function concatBytes(x, y) {
-    var ret = new Uint8Array(x.length + y.length);
-    for (var i = 0; i < x.length; i++) {
-        ret[i] = x[i];
-    }
-    for (var i = 0; i < y.length; i++) {
-        ret[x.length + i] = y[i];
-    }
-    return ret;
-}
 function copyOfRange(bytes, from, to) {
     var ret = new Uint8Array(to - from);
     var j = 0;

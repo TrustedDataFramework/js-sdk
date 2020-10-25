@@ -1,4 +1,4 @@
-import { AbiInput, Digital } from './constants'
+import {AbiInput, Binary, Digital} from './constants'
 import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeInt } from "./utils";
 import { sm3, sm2 } from '@salaku/sm-crypto'
 import { constants, ABI_DATA_ENUM, Readable} from './constants'
@@ -129,11 +129,11 @@ export class Transaction implements Encoder {
                 || this.to == constants.POS_CONTRACT_ADDR)
     }
 
-    sign(sk: string) {
+    sign(sk: Binary) {
         this.signature =
             sm2.doSignature(
                 this.getSignaturePlain(),
-                sk,
+                bin2hex(sk),
                 { userId: 'userid@soie-chain.com', der: false, hash: true }
             )
     }

@@ -1,7 +1,10 @@
-import { Binary, Digital } from "./constants"
+import { AbiInput, Binary, Digital } from "./constants"
 import { ABI_DATA_ENUM, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, MIN_SAFE_INTEGER, ONE, ZERO } from './constants'
 import BN = require('./bn')
-import { sm2, sm3 } from '@salaku/sm-crypto'
+import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
+import { Transaction } from "./tx";
+import Dict = NodeJS.Dict;
+import {Server} from "http";
 
 export function bytesToF64(buf: Uint8Array): number {
     return new Float64Array(padPrefix(reverse(buf), 0, 8).buffer)[0]
@@ -28,12 +31,12 @@ export function padPrefix(arr: Uint8Array, prefix: number, size: number) {
  * 私钥转公钥
  * @param sk 私钥
  */
-export function privateKey2PublicKey(sk: string | Uint8Array | ArrayBuffer): string {
+export function privateKey2PublicKey(sk: Binary): string {
     let s = bin2hex(sk)
 
     if (s.length / 2 != 32)
         throw new Error('invalid private key, length = ' + s.length / 2)
-    return sm2.compress(sm2.getPKFromSK(sk))
+    return sm2.compress(sm2.getPKFromSK(s))
 }
 
 /**
@@ -51,7 +54,7 @@ export function publicKey2Address(pk: Binary): string {
 /**
  * 字符串 utf8 编码
  * @param str 字符串
- */ 
+ */
 export function str2bin(str: string): Uint8Array {
     if (typeof Buffer === 'function')
         return Buffer.from(str, 'utf-8')
@@ -111,8 +114,6 @@ function hexToInt(x: number): number {
 /**
  * 解析十六进制字符串
  * decode hex string
- * @param {string | ArrayBuffer | Uint8Array} s
- * @returns {Uint8Array}
  */
 export function hex2bin(s: string | ArrayBuffer | Uint8Array): Uint8Array {
     if (s instanceof ArrayBuffer)
@@ -149,7 +150,7 @@ export function dig2str(s: Digital): string {
 
 
 
-export function bin2hex(input: Binary): string {
+export function bin2hex(input: Binary | number[]): string {
     if (typeof input === 'string')
         return input
     if (
@@ -370,4 +371,160 @@ export function uuidv4() {
         var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
+}
+
+export function sign(tx: Dict<AbiInput>, sk: Binary): Object {
+    const t = Transaction.clone(tx)
+    t.sign(sk)
+    tx.signature = t.signature
+    return tx
+}
+
+/**
+ * 生成私钥
+ */
+export function generatePrivateKey(): string {
+    return (sm2.generateKeyPairHex()).privateKey
+}
+
+export interface KeyStore {
+    publicKey: string
+    crypto: {
+        cipher: string
+        cipherText: string
+        iv: string
+        salt: string
+    }
+    id: string
+    version: string
+    mac: string
+    kdf: string
+    address: string
+}
+
+/**
+ * 随机生成字节数组 Uint8Array
+ */
+export function randomBytes(length: number): Uint8Array {
+    if (typeof crypto === 'object') {
+        const ret = new Uint8Array(length)
+        window.crypto.getRandomValues(ret)
+        return ret
+    }
+
+    let crypt = require('crypto')
+    return crypt.randomBytes(length)
+}
+
+
+export function concatBytes(x: Uint8Array, y: Uint8Array): Uint8Array {
+    const ret = new Uint8Array(x.length + y.length);
+    for (let i = 0; i < x.length; i++) {
+        ret[i] = x[i]
+    }
+    for (let i = 0; i < y.length; i++) {
+        ret[x.length + i] = y[i]
+    }
+    return ret
+}
+
+/**
+ * 生成 keystore
+ */
+export function createKeyStore(password: string, privateKey?: Binary): KeyStore {
+    if (!privateKey)
+        privateKey = generatePrivateKey()
+
+    let _priv = hex2bin(privateKey)
+
+    const ret: KeyStore = {
+        publicKey: '',
+        crypto: {
+            cipher: "sm4-128-ecb",
+            cipherText: '',
+            iv: '',
+            salt: ''
+        },
+        id: '',
+        version: "1",
+        mac: "",
+        kdf: "sm2-kdf",
+        address: ''
+    }
+
+    const salt = randomBytes(32)
+    const iv = randomBytes(16)
+    ret.publicKey = privateKey2PublicKey(_priv)
+    ret.crypto.iv = bin2hex(iv)
+    ret.crypto.salt = bin2hex(salt)
+    ret.id = uuidv4()
+
+    let key = hex2bin(
+        sm3(
+            concatBytes(salt, str2bin(password))
+        )
+    )
+
+    key = key.slice(0, 16)
+
+    let cipherText = sm4.encrypt(
+        _priv, key
+    )
+
+    cipherText = new Uint8Array(cipherText)
+
+    ret.crypto.cipherText = bin2hex(cipherText)
+    ret.mac = sm3(concatBytes(key, cipherText))
+    ret.address = publicKey2Address(ret.publicKey)
+    return ret
+}
+
+
+export function readKeyStore(ks: KeyStore, password: string): string{
+    if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
+        throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
+    }
+    let buf = concatBytes(hex2bin(ks.crypto.salt), str2bin(password));
+    const key = sm3(buf)
+    const cipherPrivKey = hex2bin(ks.crypto.cipherText)
+
+    let decrypted = sm4.decrypt(cipherPrivKey, hex2bin(key))
+    return bin2hex(decrypted)
+}
+
+
+/**
+ * 认证服务器
+ */
+export function createAuthServer(privateKey: Binary, whiteList: Binary[]): Server{
+    const URL = require('url');
+    const http = require('http')
+    const server = http.createServer()
+
+    server.on('request', function (request, response) {
+
+        let otherPublicKey = URL.parse(request.url, true).query['publicKey']
+        if (whiteList && whiteList.length) {
+            const exists = whiteList.map(x => bin2hex(x) === otherPublicKey)
+                .reduce((x, y) => x || y, false)
+            if (!exists)
+                throw new Error(`invalid public key, not in white list ${otherPublicKey}`)
+        }
+
+        // 对公钥进行解压缩
+        if (otherPublicKey.substr(0, 2) !== '04') {
+            otherPublicKey = sm2.deCompress(otherPublicKey)
+        }
+
+        // 生成密文
+        const ret = {
+            publicKey: privateKey2PublicKey(privateKey),
+            cipherText: sm2.doEncrypt(hex2bin(privateKey), otherPublicKey, sm2.C1C2C3)
+        }
+
+        response.write(JSON.stringify(ret))
+        response.end()
+
+    })
+    return server
 }
