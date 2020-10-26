@@ -45,7 +45,7 @@ var RPC = /** @class */ (function () {
             var fn_1 = this.ws.onopen || (function (e) { });
             var p_1 = new Promise(function (rs, rj) {
                 _this.ws.onopen = function (e) {
-                    fn_1.apply(_this.ws, e);
+                    fn_1.call(_this.ws, e);
                     rs();
                 };
             });
@@ -129,7 +129,7 @@ var RPC = /** @class */ (function () {
         switch (resp.code) {
             case WS_CODES.TRANSACTION_EMIT: {
                 var r_1 = resp;
-                var funcIds = this.txObservers.get(r_1.hash) || new Set();
+                var funcIds = this.txObservers.get(r_1.hash) || [];
                 funcIds.forEach(function (funcId) {
                     var func = _this.callbacks.get(funcId);
                     func(r_1);
@@ -334,6 +334,7 @@ var RPC = /** @class */ (function () {
         var n = this.nonce;
         var ret = new Promise(function (rs, rj) {
             _this.rpcCallbacks.set(n, rs);
+            setTimeout(function () { return rj('websocket rpc timeout'); }, 30 * 1000);
         });
         this.tryConnect()
             .then(function () {
@@ -428,7 +429,6 @@ var RPC = /** @class */ (function () {
     /**
      * 查看申请加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<Object>}
      */
     RPC.prototype.getAuthPending = function (contractAddress) {
         return rpcPost(this.host, this.port, "/rpc/contract/" + utils_1.bin2hex(contractAddress), {
@@ -438,7 +438,6 @@ var RPC = /** @class */ (function () {
     /**
      * 查看已经加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<[]>}
      */
     RPC.prototype.getAuthNodes = function (contractAddress) {
         return rpcPost(this.host, this.port, "/rpc/contract/" + utils_1.bin2hex(contractAddress), {

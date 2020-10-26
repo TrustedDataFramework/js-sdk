@@ -1,4 +1,4 @@
-import {assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt} from "./utils";
+import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt } from "./utils";
 import {
     ABI_DATA_ENUM,
     ABI_DATA_TYPE,
@@ -12,14 +12,14 @@ import {
     ONE,
     Readable
 } from "./constants";
-import {sm3} from '@salaku/sm-crypto'
+import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
 import BN = require("./bn");
 
-import child_process = require('child_process');
-import Dict = NodeJS.Dict;
+import child_process = require('child_process')
+import Dict = NodeJS.Dict
 
-export function compileContract(ascPath: string, src: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array>{
+export function compileContract(ascPath: string, src: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array> {
     let cmd = ascPath + ' ' + src + ' -b ' // 执行的命令
     if (opts && opts.debug)
         cmd += ' --debug '
@@ -44,8 +44,8 @@ export function compileContract(ascPath: string, src: string, opts?: { debug?: b
 
 export class TypeDef {
     type: ABI_DATA_TYPE
-    name: string
-    constructor(type: ABI_DATA_TYPE, name: string) {
+    name?: string
+    constructor(type: ABI_DATA_TYPE, name?: string) {
         this.type = type
         this.name = name
     }
@@ -284,7 +284,7 @@ export function compileABI(str: Binary): ABI[] {
     let s = str instanceof Uint8Array || str instanceof ArrayBuffer ?
         bin2str(str) : str
 
-    const TYPES = {
+    const TYPES: Dict<ABI_DATA_TYPE> = {
         u64: 'u64',
         i64: 'i64',
         f64: 'f64',
@@ -297,16 +297,16 @@ export function compileABI(str: Binary): ABI[] {
         boolean: 'bool'
     }
 
-    function getOutputs(str) {
+    function getOutputs(str): TypeDef[] {
         if (str === 'void')
             return []
         const ret = TYPES[str]
         if (!ret)
             throw new Error(`invalid type: ${str}`)
-        return [{ "type": ret }]
+        return [new TypeDef(ret)]
     }
 
-    function getInputs(str, event?: boolean) {
+    function getInputs(str, event?: boolean): TypeDef[] {
         const ret = []
         for (let p of str.split(',')) {
             if (!p)
@@ -319,10 +319,9 @@ export function compileABI(str: Binary): ABI[] {
                 l = l.split(' ')[1]
             }
             const r = lr[1].trim()
-            const o = {
-                name: l,
-                type: TYPES[r]
-            }
+            const o = new TypeDef(
+                TYPES[r], l
+            )
             if (!o.type)
                 throw new Error(`invalid type: ${r}`)
             ret.push(o)
@@ -339,24 +338,24 @@ export function compileABI(str: Binary): ABI[] {
         const r = funRe.exec(m)
         if (r[1] === '__idof')
             continue
-        ret.push({
-            type: 'function',
-            name: r[1],
-            inputs: getInputs(r[2]),
-            outputs: getOutputs(r[3])
-        })
+        ret.push(new ABI(
+            r[1],
+            'function',
+            getInputs(r[2]),
+            getOutputs(r[3])
+        ))
     }
 
 
     for (let m of (s.match(eventRe) || [])) {
         eventRe.lastIndex = 0
         const r = eventRe.exec(m)
-        ret.push({
-            type: 'event',
-            name: r[1],
-            inputs: [],
-            outputs: getInputs(r[2], true)
-        })
+        ret.push(new ABI(
+            r[1],
+            'event',
+            [],
+            getInputs(r[2], true)
+        ))
     }
     return ret
 }
@@ -364,7 +363,7 @@ export function compileABI(str: Binary): ABI[] {
 /**
  * 生成合约地址
  */
-export function getContractAddress(address: Binary, nonce: Digital) {
+export function getContractAddress(address: Binary, nonce: Digital): string{
     nonce = nonce ? nonce : 0
     let n = convert(nonce, ABI_DATA_ENUM.u256)
     let addr = hex2bin(address)

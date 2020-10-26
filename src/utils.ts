@@ -47,6 +47,7 @@ export function publicKey2Address(pk: Binary): string {
     let k = hex2bin(pk)
     if (k.length != 33)
         throw new Error('invalid public key size: ' + k.length)
+
     const buf = hex2bin(sm3(k))
     return bin2hex(buf.slice(buf.length - 20, buf.length))
 }
@@ -194,7 +195,10 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
             case ABI_DATA_ENUM.string: {
                 throw new Error('cannot convert uint8 array to string')
             }
-            case ABI_DATA_ENUM.address:
+            case ABI_DATA_ENUM.address:{
+                assert(o.length === 20, `the length of address is 20 while ${o.length} found`)
+                return o
+            }
             case ABI_DATA_ENUM.bytes: {
                 return o
             }
@@ -244,9 +248,13 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
                     return ZERO
                 throw new Error(`convert ${o} to bool failed, provide true, 1 or false, 0`)
             }
-            case ABI_DATA_ENUM.bytes:
-            case ABI_DATA_ENUM.address: {
+            case ABI_DATA_ENUM.bytes:{
                 return hex2bin(o)
+            }
+            case ABI_DATA_ENUM.address: {
+                let a = hex2bin(o)
+                assert(o.length === 20, `the length of address is 20 while ${o.length} found`)
+                return a
             }
         }
         throw new Error("unexpected abi type " + type)
@@ -341,7 +349,6 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
         }
         throw new Error("unexpected abi type " + type)
     }
-
     throw new Error("unexpected type " + o)
 }
 

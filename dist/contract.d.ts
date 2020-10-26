@@ -8,8 +8,8 @@ export declare function compileContract(ascPath: string, src: string, opts?: {
 }): Promise<Uint8Array>;
 export declare class TypeDef {
     type: ABI_DATA_TYPE;
-    name: string;
-    constructor(type: ABI_DATA_TYPE, name: string);
+    name?: string;
+    constructor(type: ABI_DATA_TYPE, name?: string);
     static from(o: any): TypeDef;
 }
 export declare class ABI {

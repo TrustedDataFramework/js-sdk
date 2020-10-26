@@ -95,7 +95,7 @@ export class RPC {
             const fn = this.ws.onopen || ((e) => { })
             const p = new Promise((rs, rj) => {
                 this.ws.onopen = (e) => {
-                    fn.apply(this.ws, e)
+                    fn.call(this.ws, e)
                     rs()
                 }
             })
@@ -132,7 +132,7 @@ export class RPC {
         return <Promise<void>>p
     }
 
-    private parse(data: Uint8Array): TransactionResp | EventResp | Resp {
+    private parse(data: Uint8Array): Resp {
         const decoded: RLPElement[] = <RLPElement[]>rlp.decode(data)
         const nonce = rlp.byteArrayToInt(<Uint8Array>decoded[0])
         const code = rlp.byteArrayToInt(<Uint8Array>decoded[1])
@@ -185,7 +185,7 @@ export class RPC {
         switch (resp.code) {
             case WS_CODES.TRANSACTION_EMIT: {
                 const r = <TransactionResp>resp
-                const funcIds = this.txObservers.get(r.hash) || new Set()
+                const funcIds = this.txObservers.get(r.hash) || []
                 funcIds.forEach(funcId => {
                     const func = this.callbacks.get(funcId)
                     func(r)
@@ -409,6 +409,7 @@ export class RPC {
         const n = this.nonce
         const ret: Promise<Resp> = new Promise((rs, rj) => {
             this.rpcCallbacks.set(n, rs)
+            setTimeout(() => rj('websocket rpc timeout'), 30 * 1000)
         })
         this.tryConnect()
             .then(() => {
@@ -509,7 +510,6 @@ export class RPC {
     /**
      * 查看申请加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<Object>}
      */
     getAuthPending(contractAddress: Binary) {
         return rpcPost(this.host, this.port, `/rpc/contract/${bin2hex(contractAddress)}`, {
@@ -520,7 +520,6 @@ export class RPC {
     /**
      * 查看已经加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<[]>}
      */
     getAuthNodes(contractAddress: Binary): Promise<string[]> {
         return <Promise<string[]>>rpcPost(this.host, this.port, `/rpc/contract/${bin2hex(contractAddress)}`, {

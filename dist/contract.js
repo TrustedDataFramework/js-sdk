@@ -243,7 +243,7 @@ function compileABI(str) {
         var ret = TYPES[str];
         if (!ret)
             throw new Error("invalid type: " + str);
-        return [{ "type": ret }];
+        return [new TypeDef(ret)];
     }
     function getInputs(str, event) {
         var ret = [];
@@ -259,10 +259,7 @@ function compileABI(str) {
                 l = l.split(' ')[1];
             }
             var r = lr[1].trim();
-            var o = {
-                name: l,
-                type: TYPES[r]
-            };
+            var o = new TypeDef(TYPES[r], l);
             if (!o.type)
                 throw new Error("invalid type: " + r);
             ret.push(o);
@@ -278,23 +275,13 @@ function compileABI(str) {
         var r = funRe.exec(m);
         if (r[1] === '__idof')
             continue;
-        ret.push({
-            type: 'function',
-            name: r[1],
-            inputs: getInputs(r[2]),
-            outputs: getOutputs(r[3])
-        });
+        ret.push(new ABI(r[1], 'function', getInputs(r[2]), getOutputs(r[3])));
     }
     for (var _b = 0, _c = (s.match(eventRe) || []); _b < _c.length; _b++) {
         var m = _c[_b];
         eventRe.lastIndex = 0;
         var r = eventRe.exec(m);
-        ret.push({
-            type: 'event',
-            name: r[1],
-            inputs: [],
-            outputs: getInputs(r[2], true)
-        });
+        ret.push(new ABI(r[1], 'event', [], getInputs(r[2], true)));
     }
     return ret;
 }

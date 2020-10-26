@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createAuthServer = exports.readKeyStore = exports.randomBytes = exports.createKeyStore = exports.generatePrivateKey = exports.sign = exports.uuidv4 = exports.bin2str = exports.bin2hex = exports.hex2bin = exports.str2bin = exports.publicKey2Address = exports.privateKey2PublicKey = exports.TX_STATUS = exports.constants = exports.ABI = exports.TypeDef = exports.getContractAddress = exports.compileABI = exports.compileContract = exports.Contract = exports.TransactionBuilder = exports.RPC = exports.Transaction = void 0;
+exports.createAuthServer = exports.readKeyStore = exports.randomBytes = exports.createKeyStore = exports.generatePrivateKey = exports.sign = exports.uuidv4 = exports.bin2str = exports.bin2hex = exports.hex2bin = exports.str2bin = exports.publicKey2Address = exports.privateKey2PublicKey = exports.TX_STATUS = exports.constants = exports.ABI = exports.TypeDef = exports.getContractAddress = exports.compileABI = exports.compileContract = exports.Contract = exports.rlp = exports.TransactionBuilder = exports.RPC = exports.Transaction = void 0;
 var tx_1 = require("./tx");
 Object.defineProperty(exports, "Transaction", { enumerable: true, get: function () { return tx_1.Transaction; } });
 var rpc_1 = require("./rpc");
 Object.defineProperty(exports, "RPC", { enumerable: true, get: function () { return rpc_1.RPC; } });
 var builder_1 = require("./builder");
 Object.defineProperty(exports, "TransactionBuilder", { enumerable: true, get: function () { return builder_1.TransactionBuilder; } });
+exports.rlp = require("./rlp");
 var contract_1 = require("./contract");
 Object.defineProperty(exports, "Contract", { enumerable: true, get: function () { return contract_1.Contract; } });
 Object.defineProperty(exports, "compileContract", { enumerable: true, get: function () { return contract_1.compileContract; } });

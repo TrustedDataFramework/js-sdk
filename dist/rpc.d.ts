@@ -115,13 +115,11 @@ export declare class RPC {
     /**
      * 查看申请加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<Object>}
      */
     getAuthPending(contractAddress: Binary): Promise<Object>;
     /**
      * 查看已经加入的地址
      * @param contractAddress 合约地址
-     * @returns {Promise<[]>}
      */
     getAuthNodes(contractAddress: Binary): Promise<string[]>;
     /**

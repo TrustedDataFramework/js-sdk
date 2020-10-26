@@ -186,7 +186,10 @@ function convert(o, type) {
             case constants_1.ABI_DATA_ENUM.string: {
                 throw new Error('cannot convert uint8 array to string');
             }
-            case constants_1.ABI_DATA_ENUM.address:
+            case constants_1.ABI_DATA_ENUM.address: {
+                assert(o.length === 20, "the length of address is 20 while " + o.length + " found");
+                return o;
+            }
             case constants_1.ABI_DATA_ENUM.bytes: {
                 return o;
             }
@@ -237,9 +240,13 @@ function convert(o, type) {
                     return constants_1.ZERO;
                 throw new Error("convert " + o + " to bool failed, provide true, 1 or false, 0");
             }
-            case constants_1.ABI_DATA_ENUM.bytes:
-            case constants_1.ABI_DATA_ENUM.address: {
+            case constants_1.ABI_DATA_ENUM.bytes: {
                 return hex2bin(o);
+            }
+            case constants_1.ABI_DATA_ENUM.address: {
+                var a = hex2bin(o);
+                assert(o.length === 20, "the length of address is 20 while " + o.length + " found");
+                return a;
             }
         }
         throw new Error("unexpected abi type " + type);

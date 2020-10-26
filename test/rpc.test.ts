@@ -1,6 +1,15 @@
-import {RPC} from '../src'
+import {RPC, constants, TransactionBuilder, privateKey2PublicKey} from '../src'
 
+const privateKeys = require('../local/privateKeys')
 const rpc = new RPC('localhost', 7010)
+const bd = new TransactionBuilder()
 
-rpc.getTransaction('4b560e65aac9fbdffae3d89b860d8dd79d161b7e0419129e8a6b8b6d5b9792dc')
-    .then(console.log)
+async function syncNonce() {
+    const n = await rpc.getNonce(privateKey2PublicKey(bd.sk))
+    let num = typeof n === 'string' ? parseInt(n) : n
+    num++
+    bd.nonce = num.toString(10)
+}
+
+rpc.getAuthNodes(constants.POA_AUTHENTICATION_ADDR)
+.then(console.log)
