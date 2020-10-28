@@ -1,4 +1,4 @@
-const {Transaction} = require('../dist/tx')
+const {Transaction} = require('../src/tx')
 
 const tx = Transaction.clone({
     "version" : 1634693120,

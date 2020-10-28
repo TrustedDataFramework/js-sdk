@@ -1,5 +1,5 @@
 import BN = require("./bn")
-import { ABI_DATA_ENUM, Digital, ONE, constants, Binary, AbiInput } from "./constants"
+import { ABI_DATA_TYPE, Digital, ONE, constants, Binary, AbiInput } from "./constants"
 import { Transaction } from "./tx"
 import { bin2hex, convert, dig2str, privateKey2PublicKey, assert } from "./utils"
 import { Contract, normalizeParams } from './contract'
@@ -29,7 +29,7 @@ export class TransactionBuilder {
 
 
     increaseNonce(): void {
-        let n = <BN>convert(this.nonce, ABI_DATA_ENUM.u64)
+        let n = <BN>convert(this.nonce, ABI_DATA_TYPE.u64)
         this.nonce = n.add(ONE).toString(10)
     }
 

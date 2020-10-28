@@ -15,7 +15,7 @@ var TransactionBuilder = /** @class */ (function () {
         this.nonce = utils_1.dig2str(nonce || 0);
     }
     TransactionBuilder.prototype.increaseNonce = function () {
-        var n = utils_1.convert(this.nonce, constants_1.ABI_DATA_ENUM.u64);
+        var n = utils_1.convert(this.nonce, constants_1.ABI_DATA_TYPE.u64);
         this.nonce = n.add(constants_1.ONE).toString(10);
     };
     /**

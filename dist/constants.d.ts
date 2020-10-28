@@ -22,10 +22,8 @@ export declare const constants: {
     POA_AUTHENTICATION_ADDR: string;
     POS_CONTRACT_ADDR: string;
 };
-export declare const ABI_DATA_TYPE_TABLE: ABI_DATA_TYPE[];
-export declare type ABI_DATA_TYPE = 'bool' | 'i64' | 'u64' | 'f64' | 'string' | 'bytes' | 'address' | 'u256';
 export declare type ABI_TYPE = 'function' | 'event';
-export declare enum ABI_DATA_ENUM {
+export declare enum ABI_DATA_TYPE {
     bool = 0,
     i64 = 1,
     u64 = 2,

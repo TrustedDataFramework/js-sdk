@@ -1,10 +1,10 @@
 import { AbiInput, Binary, Digital } from "./constants"
-import { ABI_DATA_ENUM, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, MIN_SAFE_INTEGER, ONE, ZERO } from './constants'
+import { ABI_DATA_TYPE, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, MIN_SAFE_INTEGER, ONE, ZERO } from './constants'
 import BN = require('./bn')
 import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
 import { Transaction } from "./tx";
 import Dict = NodeJS.Dict;
-import {Server} from "http";
+import { Server } from "http";
 
 export function bytesToF64(buf: Uint8Array): number {
     return new Float64Array(padPrefix(reverse(buf), 0, 8).buffer)[0]
@@ -179,27 +179,27 @@ export function bin2str(bin: Uint8Array | ArrayBuffer | string) {
 }
 
 // convert before rlp encode
-export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boolean, type: ABI_DATA_ENUM): Uint8Array | string | BN {
+export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boolean, type: ABI_DATA_TYPE): Uint8Array | string | BN {
     if (o instanceof ArrayBuffer)
         o = new Uint8Array(o)
 
     if (o instanceof Uint8Array) {
         switch (type) {
-            case ABI_DATA_ENUM.bool:
-            case ABI_DATA_ENUM.u256:
-            case ABI_DATA_ENUM.i64:
-            case ABI_DATA_ENUM.u64:
-            case ABI_DATA_ENUM.f64: {
+            case ABI_DATA_TYPE.bool:
+            case ABI_DATA_TYPE.u256:
+            case ABI_DATA_TYPE.i64:
+            case ABI_DATA_TYPE.u64:
+            case ABI_DATA_TYPE.f64: {
                 throw new Error('cannot convert uint8 array to u64, u256 or bool')
             }
-            case ABI_DATA_ENUM.string: {
+            case ABI_DATA_TYPE.string: {
                 throw new Error('cannot convert uint8 array to string')
             }
-            case ABI_DATA_ENUM.address:{
+            case ABI_DATA_TYPE.address: {
                 assert(o.length === 20, `the length of address is 20 while ${o.length} found`)
                 return o
             }
-            case ABI_DATA_ENUM.bytes: {
+            case ABI_DATA_TYPE.bytes: {
                 return o
             }
         }
@@ -208,21 +208,21 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
 
     if (typeof o === 'string') {
         switch (type) {
-            case ABI_DATA_ENUM.u256:
-            case ABI_DATA_ENUM.u64: {
+            case ABI_DATA_TYPE.u256:
+            case ABI_DATA_TYPE.u64: {
                 let ret: BN
                 if (o.substr(0, 2) === '0x') {
                     ret = new BN(o.substr(2, o.length - 2), 16)
                 } else {
                     ret = new BN(o, 10)
                 }
-                if (type === ABI_DATA_ENUM.u64)
+                if (type === ABI_DATA_TYPE.u64)
                     assert(ret.cmp(MAX_U64) <= 0 && !ret.isNeg(), `${ret.toString(10)} overflows u64 ${MAX_U64.toString(10)}`)
-                if (type === ABI_DATA_ENUM.u256)
+                if (type === ABI_DATA_TYPE.u256)
                     assert(ret.cmp(MAX_U256) <= 0 && !ret.isNeg(), `${ret.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                 return ret
             }
-            case ABI_DATA_ENUM.i64: {
+            case ABI_DATA_TYPE.i64: {
                 let ret: BN
                 if (o.substr(0, 2) === '0x') {
                     ret = new BN(o.substr(2, o.length - 2), 16)
@@ -233,14 +233,14 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
                 assert(ret.cmp(MIN_I64) >= 0, `${ret.toString(10)} overflows min i64 ${MIN_I64.toString(10)}`)
                 return ret
             }
-            case ABI_DATA_ENUM.f64: {
+            case ABI_DATA_TYPE.f64: {
                 let f = parseFloat(o)
                 return f64ToBytes(f)
             }
-            case ABI_DATA_ENUM.string: {
+            case ABI_DATA_TYPE.string: {
                 return o
             }
-            case ABI_DATA_ENUM.bool: {
+            case ABI_DATA_TYPE.bool: {
                 let l = o.toLowerCase()
                 if ('true' === l || '1' === o)
                     return ONE
@@ -248,12 +248,12 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
                     return ZERO
                 throw new Error(`convert ${o} to bool failed, provide true, 1 or false, 0`)
             }
-            case ABI_DATA_ENUM.bytes:{
+            case ABI_DATA_TYPE.bytes: {
                 return hex2bin(o)
             }
-            case ABI_DATA_ENUM.address: {
+            case ABI_DATA_TYPE.address: {
                 let a = hex2bin(o)
-                assert(o.length === 20, `the length of address is 20 while ${o.length} found`)
+                assert(a.length === 20, `the length of address is 20 while ${a.length} found`)
                 return a
             }
         }
@@ -262,32 +262,32 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
 
     if (typeof o === 'number') {
         switch (type) {
-            case ABI_DATA_ENUM.u256:
-            case ABI_DATA_ENUM.u64: {
+            case ABI_DATA_TYPE.u256:
+            case ABI_DATA_TYPE.u64: {
                 if (o < 0 || !Number.isInteger(o))
                     throw new Error('o is negative or not a integer')
                 return new BN(o)
             }
-            case ABI_DATA_ENUM.string: {
+            case ABI_DATA_TYPE.string: {
                 return o.toString(10)
             }
-            case ABI_DATA_ENUM.bool: {
+            case ABI_DATA_TYPE.bool: {
                 if (1 === o || 0 === o)
                     return new BN(o)
                 throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
             }
-            case ABI_DATA_ENUM.bytes:
-            case ABI_DATA_ENUM.address: {
+            case ABI_DATA_TYPE.bytes:
+            case ABI_DATA_TYPE.address: {
                 throw new Error("cannot convert number to address or bytes")
             }
-            case ABI_DATA_ENUM.i64: {
+            case ABI_DATA_TYPE.i64: {
                 if (!Number.isInteger(o))
                     throw new Error('o is negative or not a integer')
                 if (o >= 0)
                     return new BN(o)
-                return convert(new BN(o), ABI_DATA_ENUM.i64)
+                return convert(new BN(o), ABI_DATA_TYPE.i64)
             }
-            case ABI_DATA_ENUM.f64: {
+            case ABI_DATA_TYPE.f64: {
                 return f64ToBytes(o)
             }
         }
@@ -296,23 +296,23 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
 
     if (o instanceof BN) {
         switch (type) {
-            case ABI_DATA_ENUM.u256:
-            case ABI_DATA_ENUM.u64: {
+            case ABI_DATA_TYPE.u256:
+            case ABI_DATA_TYPE.u64: {
                 return o;
             }
-            case ABI_DATA_ENUM.string: {
+            case ABI_DATA_TYPE.string: {
                 return o.toString(10)
             }
-            case ABI_DATA_ENUM.bytes:
-            case ABI_DATA_ENUM.address: {
+            case ABI_DATA_TYPE.bytes:
+            case ABI_DATA_TYPE.address: {
                 throw new Error("cannot convert big number to address or bytes")
             }
-            case ABI_DATA_ENUM.bool: {
+            case ABI_DATA_TYPE.bool: {
                 if (o.cmp(ZERO) === 0 || o.cmp(ONE) === 0)
                     return o
                 throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
             }
-            case ABI_DATA_ENUM.i64: {
+            case ABI_DATA_TYPE.i64: {
                 assert(o.cmp(MAX_I64) <= 0, `${o.toString(10)} overflows max i64 ${MAX_I64.toString(10)}`)
                 assert(o.cmp(MIN_I64) >= 0, `${o.toString(10)} overflows min i64 ${MIN_I64.toString(10)}`)
                 if (o.cmp(ZERO) >= 0)
@@ -321,7 +321,7 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
                 buf = inverse(buf)
                 return new BN(buf).add(ONE)
             }
-            case ABI_DATA_ENUM.f64: {
+            case ABI_DATA_TYPE.f64: {
                 return f64ToBytes(o.toNumber())
             }
         }
@@ -330,20 +330,20 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
 
     if (typeof o === 'boolean') {
         switch (type) {
-            case ABI_DATA_ENUM.u256:
-            case ABI_DATA_ENUM.i64:
-            case ABI_DATA_ENUM.bool:
-            case ABI_DATA_ENUM.u64: {
+            case ABI_DATA_TYPE.u256:
+            case ABI_DATA_TYPE.i64:
+            case ABI_DATA_TYPE.bool:
+            case ABI_DATA_TYPE.u64: {
                 return o ? ONE : ZERO;
             }
-            case ABI_DATA_ENUM.string: {
+            case ABI_DATA_TYPE.string: {
                 return o ? 'true' : 'false'
             }
-            case ABI_DATA_ENUM.bytes:
-            case ABI_DATA_ENUM.address: {
+            case ABI_DATA_TYPE.bytes:
+            case ABI_DATA_TYPE.address: {
                 throw new Error("cannot convert boolean to address or bytes")
             }
-            case ABI_DATA_ENUM.f64: {
+            case ABI_DATA_TYPE.f64: {
                 return f64ToBytes(o ? 1 : 0)
             }
         }
@@ -487,7 +487,7 @@ export function createKeyStore(password: string, privateKey?: Binary): KeyStore 
 }
 
 
-export function readKeyStore(ks: KeyStore, password: string): string{
+export function readKeyStore(ks: KeyStore, password: string): string {
     if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
         throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
     }
@@ -503,7 +503,7 @@ export function readKeyStore(ks: KeyStore, password: string): string{
 /**
  * 认证服务器
  */
-export function createAuthServer(privateKey: Binary, whiteList: Binary[]): Server{
+export function createAuthServer(privateKey: Binary, whiteList: Binary[]): Server {
     const URL = require('url');
     const http = require('http')
     const server = http.createServer()

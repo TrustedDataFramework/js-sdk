@@ -1,7 +1,7 @@
 import { AbiInput, Binary, Digital } from './constants'
 import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeInt } from "./utils";
 import { sm3, sm2 } from '@salaku/sm-crypto'
-import { constants, ABI_DATA_ENUM, Readable } from './constants'
+import { constants, ABI_DATA_TYPE, Readable } from './constants'
 import rlp = require('./rlp')
 import BN = require('./bn')
 import { Encoder } from "./rlp";
@@ -80,22 +80,22 @@ export class Transaction implements Encoder {
      */
     getEncoded() {
         const arr = this.__toArr()
-        arr.push(convert(this.signature || '', ABI_DATA_ENUM.bytes))
+        arr.push(convert(this.signature || '', ABI_DATA_TYPE.bytes))
         return rlp.encode(arr)
     }
 
     __toArr() {
         return [
-            convert(this.version || 0, ABI_DATA_ENUM.u64),
-            convert(this.type || 0, ABI_DATA_ENUM.u64),
-            convert(this.createdAt || '0', ABI_DATA_ENUM.u64),
-            convert(this.nonce || '0', ABI_DATA_ENUM.u64),
-            convert(this.from || '', ABI_DATA_ENUM.bytes),
-            convert(this.gasLimit || '0', ABI_DATA_ENUM.u64),
-            convert(this.gasPrice || '0', ABI_DATA_ENUM.u256),
-            convert(this.amount || '0', ABI_DATA_ENUM.u256),
-            convert(this.payload || '', ABI_DATA_ENUM.bytes),
-            convert(this.to || '', ABI_DATA_ENUM.address)
+            convert(this.version || 0, ABI_DATA_TYPE.u64),
+            convert(this.type || 0, ABI_DATA_TYPE.u64),
+            convert(this.createdAt || '0', ABI_DATA_TYPE.u64),
+            convert(this.nonce || '0', ABI_DATA_TYPE.u64),
+            convert(this.from || '', ABI_DATA_TYPE.bytes),
+            convert(this.gasLimit || '0', ABI_DATA_TYPE.u64),
+            convert(this.gasPrice || '0', ABI_DATA_TYPE.u256),
+            convert(this.amount || '0', ABI_DATA_TYPE.u256),
+            convert(this.payload || '', ABI_DATA_TYPE.bytes),
+            convert(this.to || '', ABI_DATA_TYPE.address)
         ]
     }
 

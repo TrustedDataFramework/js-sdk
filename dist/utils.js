@@ -176,21 +176,21 @@ function convert(o, type) {
         o = new Uint8Array(o);
     if (o instanceof Uint8Array) {
         switch (type) {
-            case constants_1.ABI_DATA_ENUM.bool:
-            case constants_1.ABI_DATA_ENUM.u256:
-            case constants_1.ABI_DATA_ENUM.i64:
-            case constants_1.ABI_DATA_ENUM.u64:
-            case constants_1.ABI_DATA_ENUM.f64: {
+            case constants_1.ABI_DATA_TYPE.bool:
+            case constants_1.ABI_DATA_TYPE.u256:
+            case constants_1.ABI_DATA_TYPE.i64:
+            case constants_1.ABI_DATA_TYPE.u64:
+            case constants_1.ABI_DATA_TYPE.f64: {
                 throw new Error('cannot convert uint8 array to u64, u256 or bool');
             }
-            case constants_1.ABI_DATA_ENUM.string: {
+            case constants_1.ABI_DATA_TYPE.string: {
                 throw new Error('cannot convert uint8 array to string');
             }
-            case constants_1.ABI_DATA_ENUM.address: {
+            case constants_1.ABI_DATA_TYPE.address: {
                 assert(o.length === 20, "the length of address is 20 while " + o.length + " found");
                 return o;
             }
-            case constants_1.ABI_DATA_ENUM.bytes: {
+            case constants_1.ABI_DATA_TYPE.bytes: {
                 return o;
             }
         }
@@ -198,8 +198,8 @@ function convert(o, type) {
     }
     if (typeof o === 'string') {
         switch (type) {
-            case constants_1.ABI_DATA_ENUM.u256:
-            case constants_1.ABI_DATA_ENUM.u64: {
+            case constants_1.ABI_DATA_TYPE.u256:
+            case constants_1.ABI_DATA_TYPE.u64: {
                 var ret = void 0;
                 if (o.substr(0, 2) === '0x') {
                     ret = new BN(o.substr(2, o.length - 2), 16);
@@ -207,13 +207,13 @@ function convert(o, type) {
                 else {
                     ret = new BN(o, 10);
                 }
-                if (type === constants_1.ABI_DATA_ENUM.u64)
+                if (type === constants_1.ABI_DATA_TYPE.u64)
                     assert(ret.cmp(constants_1.MAX_U64) <= 0 && !ret.isNeg(), ret.toString(10) + " overflows u64 " + constants_1.MAX_U64.toString(10));
-                if (type === constants_1.ABI_DATA_ENUM.u256)
+                if (type === constants_1.ABI_DATA_TYPE.u256)
                     assert(ret.cmp(constants_1.MAX_U256) <= 0 && !ret.isNeg(), ret.toString(10) + " overflows max u256 " + constants_1.MAX_U256.toString(10));
                 return ret;
             }
-            case constants_1.ABI_DATA_ENUM.i64: {
+            case constants_1.ABI_DATA_TYPE.i64: {
                 var ret = void 0;
                 if (o.substr(0, 2) === '0x') {
                     ret = new BN(o.substr(2, o.length - 2), 16);
@@ -225,14 +225,14 @@ function convert(o, type) {
                 assert(ret.cmp(constants_1.MIN_I64) >= 0, ret.toString(10) + " overflows min i64 " + constants_1.MIN_I64.toString(10));
                 return ret;
             }
-            case constants_1.ABI_DATA_ENUM.f64: {
+            case constants_1.ABI_DATA_TYPE.f64: {
                 var f = parseFloat(o);
                 return f64ToBytes(f);
             }
-            case constants_1.ABI_DATA_ENUM.string: {
+            case constants_1.ABI_DATA_TYPE.string: {
                 return o;
             }
-            case constants_1.ABI_DATA_ENUM.bool: {
+            case constants_1.ABI_DATA_TYPE.bool: {
                 var l = o.toLowerCase();
                 if ('true' === l || '1' === o)
                     return constants_1.ONE;
@@ -240,12 +240,12 @@ function convert(o, type) {
                     return constants_1.ZERO;
                 throw new Error("convert " + o + " to bool failed, provide true, 1 or false, 0");
             }
-            case constants_1.ABI_DATA_ENUM.bytes: {
+            case constants_1.ABI_DATA_TYPE.bytes: {
                 return hex2bin(o);
             }
-            case constants_1.ABI_DATA_ENUM.address: {
+            case constants_1.ABI_DATA_TYPE.address: {
                 var a = hex2bin(o);
-                assert(o.length === 20, "the length of address is 20 while " + o.length + " found");
+                assert(a.length === 20, "the length of address is 20 while " + a.length + " found");
                 return a;
             }
         }
@@ -253,32 +253,32 @@ function convert(o, type) {
     }
     if (typeof o === 'number') {
         switch (type) {
-            case constants_1.ABI_DATA_ENUM.u256:
-            case constants_1.ABI_DATA_ENUM.u64: {
+            case constants_1.ABI_DATA_TYPE.u256:
+            case constants_1.ABI_DATA_TYPE.u64: {
                 if (o < 0 || !Number.isInteger(o))
                     throw new Error('o is negative or not a integer');
                 return new BN(o);
             }
-            case constants_1.ABI_DATA_ENUM.string: {
+            case constants_1.ABI_DATA_TYPE.string: {
                 return o.toString(10);
             }
-            case constants_1.ABI_DATA_ENUM.bool: {
+            case constants_1.ABI_DATA_TYPE.bool: {
                 if (1 === o || 0 === o)
                     return new BN(o);
                 throw new Error("convert " + o + " to bool failed, provide 1 or 0");
             }
-            case constants_1.ABI_DATA_ENUM.bytes:
-            case constants_1.ABI_DATA_ENUM.address: {
+            case constants_1.ABI_DATA_TYPE.bytes:
+            case constants_1.ABI_DATA_TYPE.address: {
                 throw new Error("cannot convert number to address or bytes");
             }
-            case constants_1.ABI_DATA_ENUM.i64: {
+            case constants_1.ABI_DATA_TYPE.i64: {
                 if (!Number.isInteger(o))
                     throw new Error('o is negative or not a integer');
                 if (o >= 0)
                     return new BN(o);
-                return convert(new BN(o), constants_1.ABI_DATA_ENUM.i64);
+                return convert(new BN(o), constants_1.ABI_DATA_TYPE.i64);
             }
-            case constants_1.ABI_DATA_ENUM.f64: {
+            case constants_1.ABI_DATA_TYPE.f64: {
                 return f64ToBytes(o);
             }
         }
@@ -286,23 +286,23 @@ function convert(o, type) {
     }
     if (o instanceof BN) {
         switch (type) {
-            case constants_1.ABI_DATA_ENUM.u256:
-            case constants_1.ABI_DATA_ENUM.u64: {
+            case constants_1.ABI_DATA_TYPE.u256:
+            case constants_1.ABI_DATA_TYPE.u64: {
                 return o;
             }
-            case constants_1.ABI_DATA_ENUM.string: {
+            case constants_1.ABI_DATA_TYPE.string: {
                 return o.toString(10);
             }
-            case constants_1.ABI_DATA_ENUM.bytes:
-            case constants_1.ABI_DATA_ENUM.address: {
+            case constants_1.ABI_DATA_TYPE.bytes:
+            case constants_1.ABI_DATA_TYPE.address: {
                 throw new Error("cannot convert big number to address or bytes");
             }
-            case constants_1.ABI_DATA_ENUM.bool: {
+            case constants_1.ABI_DATA_TYPE.bool: {
                 if (o.cmp(constants_1.ZERO) === 0 || o.cmp(constants_1.ONE) === 0)
                     return o;
                 throw new Error("convert " + o + " to bool failed, provide 1 or 0");
             }
-            case constants_1.ABI_DATA_ENUM.i64: {
+            case constants_1.ABI_DATA_TYPE.i64: {
                 assert(o.cmp(constants_1.MAX_I64) <= 0, o.toString(10) + " overflows max i64 " + constants_1.MAX_I64.toString(10));
                 assert(o.cmp(constants_1.MIN_I64) >= 0, o.toString(10) + " overflows min i64 " + constants_1.MIN_I64.toString(10));
                 if (o.cmp(constants_1.ZERO) >= 0)
@@ -311,7 +311,7 @@ function convert(o, type) {
                 buf = inverse(buf);
                 return new BN(buf).add(constants_1.ONE);
             }
-            case constants_1.ABI_DATA_ENUM.f64: {
+            case constants_1.ABI_DATA_TYPE.f64: {
                 return f64ToBytes(o.toNumber());
             }
         }
@@ -319,20 +319,20 @@ function convert(o, type) {
     }
     if (typeof o === 'boolean') {
         switch (type) {
-            case constants_1.ABI_DATA_ENUM.u256:
-            case constants_1.ABI_DATA_ENUM.i64:
-            case constants_1.ABI_DATA_ENUM.bool:
-            case constants_1.ABI_DATA_ENUM.u64: {
+            case constants_1.ABI_DATA_TYPE.u256:
+            case constants_1.ABI_DATA_TYPE.i64:
+            case constants_1.ABI_DATA_TYPE.bool:
+            case constants_1.ABI_DATA_TYPE.u64: {
                 return o ? constants_1.ONE : constants_1.ZERO;
             }
-            case constants_1.ABI_DATA_ENUM.string: {
+            case constants_1.ABI_DATA_TYPE.string: {
                 return o ? 'true' : 'false';
             }
-            case constants_1.ABI_DATA_ENUM.bytes:
-            case constants_1.ABI_DATA_ENUM.address: {
+            case constants_1.ABI_DATA_TYPE.bytes:
+            case constants_1.ABI_DATA_TYPE.address: {
                 throw new Error("cannot convert boolean to address or bytes");
             }
-            case constants_1.ABI_DATA_ENUM.f64: {
+            case constants_1.ABI_DATA_TYPE.f64: {
                 return f64ToBytes(o ? 1 : 0);
             }
         }

@@ -1,8 +1,6 @@
 import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt } from "./utils";
 import {
-    ABI_DATA_ENUM,
     ABI_DATA_TYPE,
-    ABI_DATA_TYPE_TABLE,
     ABI_TYPE,
     AbiInput,
     Binary,
@@ -43,9 +41,12 @@ export function compileContract(ascPath: string, src: string, opts?: { debug?: b
 
 
 export class TypeDef {
-    type: ABI_DATA_TYPE
+    type: string
     name?: string
-    constructor(type: ABI_DATA_TYPE, name?: string) {
+    constructor(type: string, name?: string) {
+        if (typeof type === 'string')
+            type = type.toLocaleLowerCase()
+        assert(ABI_DATA_TYPE[type] !== undefined, `invalid type ${type}`)
         this.type = type
         this.name = name
     }
@@ -206,10 +207,10 @@ export class Contract {
     }
 
 
-    abiEncode(name: string, li?: AbiInput | AbiInput[] | Dict<AbiInput>): [ABI_DATA_ENUM[], Array<string | Uint8Array | BN>, ABI_DATA_ENUM[]] {
+    abiEncode(name: string, li?: AbiInput | AbiInput[] | Dict<AbiInput>): [ABI_DATA_TYPE[], Array<string | Uint8Array | BN>, ABI_DATA_TYPE[]] {
         const func = this.getABI(name, 'function')
         let retType = func.outputs && func.outputs[0] && func.outputs[0].type
-        const retTypes = retType ? [ABI_DATA_TYPE_TABLE.indexOf(retType)] : []
+        const retTypes = retType ? [ABI_DATA_TYPE[retType]] : []
 
         if (typeof li === 'string' || typeof li === 'number' || li instanceof BN || li instanceof ArrayBuffer || li instanceof Uint8Array || typeof li === 'boolean')
             return this.abiEncode(name, [li])
@@ -224,8 +225,8 @@ export class Contract {
             if (li.length != func.inputs.length)
                 throw new Error(`abi encode failed for ${func.name}, expect ${func.inputs.length} parameters while ${li.length} found`)
             for (let i = 0; i < li.length; i++) {
-                arr[i] = convert(li[i], ABI_DATA_TYPE_TABLE.indexOf(func.inputs[i].type))
-                types[i] = ABI_DATA_TYPE_TABLE.indexOf(func.inputs[i].type)
+                arr[i] = convert(li[i], ABI_DATA_TYPE[func.inputs[i].type])
+                types[i] = ABI_DATA_TYPE[func.inputs[i].type]
             }
             return [types, arr, retTypes]
         }
@@ -234,11 +235,11 @@ export class Contract {
         const types = []
         for (let i = 0; i < func.inputs.length; i++) {
             const input = func.inputs[i]
-            types[i] = ABI_DATA_ENUM[func.inputs[i].type]
+            types[i] = ABI_DATA_TYPE[func.inputs[i].type]
             if (!(input.name in li)) {
                 throw new Error(`key ${input.name} not found in parameters`)
             }
-            arr[i] = convert(li[input.name], ABI_DATA_TYPE_TABLE.indexOf(input.type))
+            arr[i] = convert(li[input.name], ABI_DATA_TYPE[input.type])
         }
         return [types, arr, retTypes]
     }
@@ -265,8 +266,8 @@ export class Contract {
                 [
                     a.name,
                     a.type === 'function' ? 0 : 1,
-                    a.inputs.map(x => ABI_DATA_TYPE_TABLE.indexOf(x.type)),
-                    a.outputs.map(x => ABI_DATA_TYPE_TABLE.indexOf(x.type))
+                    a.inputs.map(x => ABI_DATA_TYPE[x.type]),
+                    a.outputs.map(x => ABI_DATA_TYPE[x.type])
                 ]
             )
         }
@@ -284,7 +285,7 @@ export function compileABI(str: Binary): ABI[] {
     let s = str instanceof Uint8Array || str instanceof ArrayBuffer ?
         bin2str(str) : str
 
-    const TYPES: Dict<ABI_DATA_TYPE> = {
+    const TYPES = {
         u64: 'u64',
         i64: 'i64',
         f64: 'f64',
@@ -363,9 +364,9 @@ export function compileABI(str: Binary): ABI[] {
 /**
  * 生成合约地址
  */
-export function getContractAddress(address: Binary, nonce: Digital): string{
+export function getContractAddress(address: Binary, nonce: Digital): string {
     nonce = nonce ? nonce : 0
-    let n = convert(nonce, ABI_DATA_ENUM.u256)
+    let n = convert(nonce, ABI_DATA_TYPE.u256)
     let addr = hex2bin(address)
     if (addr.length !== 20)
         throw new Error(`address length should be 20 while ${addr.length} found`)

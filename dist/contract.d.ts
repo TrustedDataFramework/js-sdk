@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { ABI_DATA_ENUM, ABI_DATA_TYPE, ABI_TYPE, AbiInput, Binary, Digital, Readable } from "./constants";
+import { ABI_DATA_TYPE, ABI_TYPE, AbiInput, Binary, Digital, Readable } from "./constants";
 import BN = require("./bn");
 import Dict = NodeJS.Dict;
 export declare function compileContract(ascPath: string, src: string, opts?: {
@@ -7,9 +7,9 @@ export declare function compileContract(ascPath: string, src: string, opts?: {
     optimize?: boolean;
 }): Promise<Uint8Array>;
 export declare class TypeDef {
-    type: ABI_DATA_TYPE;
+    type: string;
     name?: string;
-    constructor(type: ABI_DATA_TYPE, name?: string);
+    constructor(type: string, name?: string);
     static from(o: any): TypeDef;
 }
 export declare class ABI {
@@ -30,7 +30,7 @@ export declare class Contract {
     abi: ABI[];
     binary: Uint8Array;
     constructor(address?: Binary, abi?: any[], binary?: Uint8Array | ArrayBuffer);
-    abiEncode(name: string, li?: AbiInput | AbiInput[] | Dict<AbiInput>): [ABI_DATA_ENUM[], Array<string | Uint8Array | BN>, ABI_DATA_ENUM[]];
+    abiEncode(name: string, li?: AbiInput | AbiInput[] | Dict<AbiInput>): [ABI_DATA_TYPE[], Array<string | Uint8Array | BN>, ABI_DATA_TYPE[]];
     abiDecode(name: string, buf?: Uint8Array[], type?: ABI_TYPE): Readable | Readable[] | Dict<Readable>;
     abiToBinary(): any[];
     getABI(name: string, type: ABI_TYPE): ABI;

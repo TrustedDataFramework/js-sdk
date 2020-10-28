@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { AbiInput, Binary, Digital } from "./constants";
-import { ABI_DATA_ENUM } from './constants';
+import { ABI_DATA_TYPE } from './constants';
 import BN = require('./bn');
 import Dict = NodeJS.Dict;
 import { Server } from "http";
@@ -40,7 +40,7 @@ export declare function assert(truth: any, err: string): void;
 export declare function dig2str(s: Digital): string;
 export declare function bin2hex(input: Binary | number[]): string;
 export declare function bin2str(bin: Uint8Array | ArrayBuffer | string): string;
-export declare function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boolean, type: ABI_DATA_ENUM): Uint8Array | string | BN;
+export declare function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boolean, type: ABI_DATA_TYPE): Uint8Array | string | BN;
 export declare function toSafeInt(x: string | number | BN | ArrayBuffer | Uint8Array): string | number;
 export declare function uuidv4(): string;
 export declare function sign(tx: Dict<AbiInput>, sk: Binary): Object;

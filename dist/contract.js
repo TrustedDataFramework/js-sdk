@@ -27,6 +27,9 @@ function compileContract(ascPath, src, opts) {
 exports.compileContract = compileContract;
 var TypeDef = /** @class */ (function () {
     function TypeDef(type, name) {
+        if (typeof type === 'string')
+            type = type.toLocaleLowerCase();
+        utils_1.assert(constants_1.ABI_DATA_TYPE[type] !== undefined, "invalid type " + type);
         this.type = type;
         this.name = name;
     }
@@ -162,7 +165,7 @@ var Contract = /** @class */ (function () {
     Contract.prototype.abiEncode = function (name, li) {
         var func = this.getABI(name, 'function');
         var retType = func.outputs && func.outputs[0] && func.outputs[0].type;
-        var retTypes = retType ? [constants_1.ABI_DATA_TYPE_TABLE.indexOf(retType)] : [];
+        var retTypes = retType ? [constants_1.ABI_DATA_TYPE[retType]] : [];
         if (typeof li === 'string' || typeof li === 'number' || li instanceof BN || li instanceof ArrayBuffer || li instanceof Uint8Array || typeof li === 'boolean')
             return this.abiEncode(name, [li]);
         if (li === undefined || li === null)
@@ -173,8 +176,8 @@ var Contract = /** @class */ (function () {
             if (li.length != func.inputs.length)
                 throw new Error("abi encode failed for " + func.name + ", expect " + func.inputs.length + " parameters while " + li.length + " found");
             for (var i = 0; i < li.length; i++) {
-                arr_1[i] = utils_1.convert(li[i], constants_1.ABI_DATA_TYPE_TABLE.indexOf(func.inputs[i].type));
-                types_1[i] = constants_1.ABI_DATA_TYPE_TABLE.indexOf(func.inputs[i].type);
+                arr_1[i] = utils_1.convert(li[i], constants_1.ABI_DATA_TYPE[func.inputs[i].type]);
+                types_1[i] = constants_1.ABI_DATA_TYPE[func.inputs[i].type];
             }
             return [types_1, arr_1, retTypes];
         }
@@ -182,11 +185,11 @@ var Contract = /** @class */ (function () {
         var types = [];
         for (var i = 0; i < func.inputs.length; i++) {
             var input = func.inputs[i];
-            types[i] = constants_1.ABI_DATA_ENUM[func.inputs[i].type];
+            types[i] = constants_1.ABI_DATA_TYPE[func.inputs[i].type];
             if (!(input.name in li)) {
                 throw new Error("key " + input.name + " not found in parameters");
             }
-            arr[i] = utils_1.convert(li[input.name], constants_1.ABI_DATA_TYPE_TABLE.indexOf(input.type));
+            arr[i] = utils_1.convert(li[input.name], constants_1.ABI_DATA_TYPE[input.type]);
         }
         return [types, arr, retTypes];
     };
@@ -208,8 +211,8 @@ var Contract = /** @class */ (function () {
             ret.push([
                 a.name,
                 a.type === 'function' ? 0 : 1,
-                a.inputs.map(function (x) { return constants_1.ABI_DATA_TYPE_TABLE.indexOf(x.type); }),
-                a.outputs.map(function (x) { return constants_1.ABI_DATA_TYPE_TABLE.indexOf(x.type); })
+                a.inputs.map(function (x) { return constants_1.ABI_DATA_TYPE[x.type]; }),
+                a.outputs.map(function (x) { return constants_1.ABI_DATA_TYPE[x.type]; })
             ]);
         }
         return ret;
@@ -291,7 +294,7 @@ exports.compileABI = compileABI;
  */
 function getContractAddress(address, nonce) {
     nonce = nonce ? nonce : 0;
-    var n = utils_1.convert(nonce, constants_1.ABI_DATA_ENUM.u256);
+    var n = utils_1.convert(nonce, constants_1.ABI_DATA_TYPE.u256);
     var addr = utils_1.hex2bin(address);
     if (addr.length !== 20)
         throw new Error("address length should be 20 while " + addr.length + " found");

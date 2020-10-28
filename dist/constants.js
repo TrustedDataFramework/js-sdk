@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ZERO = exports.ONE = exports.MIN_SAFE_INTEGER = exports.MAX_SAFE_INTEGER = exports.MIN_I64 = exports.MAX_I64 = exports.MAX_U256 = exports.MAX_U64 = exports.ABI_DATA_ENUM = exports.ABI_DATA_TYPE_TABLE = exports.constants = exports.TX_STATUS = void 0;
+exports.ZERO = exports.ONE = exports.MIN_SAFE_INTEGER = exports.MAX_SAFE_INTEGER = exports.MIN_I64 = exports.MAX_I64 = exports.MAX_U256 = exports.MAX_U64 = exports.ABI_DATA_TYPE = exports.constants = exports.TX_STATUS = void 0;
 var BN = require("./bn");
 var TX_STATUS;
 (function (TX_STATUS) {
@@ -21,18 +21,17 @@ exports.constants = {
     POA_AUTHENTICATION_ADDR: "0000000000000000000000000000000000000004",
     POS_CONTRACT_ADDR: "0000000000000000000000000000000000000005"
 };
-exports.ABI_DATA_TYPE_TABLE = ['bool', 'i64', 'u64', 'f64', 'string', 'bytes', 'address', 'u256'];
-var ABI_DATA_ENUM;
-(function (ABI_DATA_ENUM) {
-    ABI_DATA_ENUM[ABI_DATA_ENUM["bool"] = 0] = "bool";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["i64"] = 1] = "i64";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["u64"] = 2] = "u64";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["f64"] = 3] = "f64";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["string"] = 4] = "string";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["bytes"] = 5] = "bytes";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["address"] = 6] = "address";
-    ABI_DATA_ENUM[ABI_DATA_ENUM["u256"] = 7] = "u256";
-})(ABI_DATA_ENUM = exports.ABI_DATA_ENUM || (exports.ABI_DATA_ENUM = {}));
+var ABI_DATA_TYPE;
+(function (ABI_DATA_TYPE) {
+    ABI_DATA_TYPE[ABI_DATA_TYPE["bool"] = 0] = "bool";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["i64"] = 1] = "i64";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["u64"] = 2] = "u64";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["f64"] = 3] = "f64";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["string"] = 4] = "string";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["bytes"] = 5] = "bytes";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["address"] = 6] = "address";
+    ABI_DATA_TYPE[ABI_DATA_TYPE["u256"] = 7] = "u256";
+})(ABI_DATA_TYPE = exports.ABI_DATA_TYPE || (exports.ABI_DATA_TYPE = {}));
 exports.MAX_U64 = new BN('ffffffffffffffff', 16);
 exports.MAX_U256 = new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16);
 exports.MAX_I64 = new BN('9223372036854775807', 10);

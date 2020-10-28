@@ -26,14 +26,10 @@ export const constants = {
     POS_CONTRACT_ADDR: "0000000000000000000000000000000000000005"
 }
 
-export const ABI_DATA_TYPE_TABLE: ABI_DATA_TYPE[] = ['bool', 'i64', 'u64', 'f64', 'string', 'bytes', 'address', 'u256']
-
-export type ABI_DATA_TYPE = 'bool' | 'i64' | 'u64' | 'f64' | 'string' | 'bytes' | 'address' | 'u256'
-
 export type ABI_TYPE = 'function' | 'event'
 
 
-export enum ABI_DATA_ENUM {
+export enum ABI_DATA_TYPE {
     bool,
     i64,
     u64,
