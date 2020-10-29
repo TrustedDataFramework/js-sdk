@@ -71,7 +71,7 @@ var Transaction = /** @class */ (function () {
             utils_1.convert(this.gasPrice || '0', constants_1.ABI_DATA_TYPE.u256),
             utils_1.convert(this.amount || '0', constants_1.ABI_DATA_TYPE.u256),
             utils_1.convert(this.payload || '', constants_1.ABI_DATA_TYPE.bytes),
-            utils_1.convert(this.to || '', constants_1.ABI_DATA_TYPE.address)
+            (this.to && this.to.length) ? utils_1.convert(this.to, constants_1.ABI_DATA_TYPE.address) : ''
         ];
     };
     // convert AbiInput to readable

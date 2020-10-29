@@ -9,7 +9,7 @@ const EMPTY_BYTES = new Uint8Array(0);
 const EMPTY_RLP_ARRAY = new Uint8Array([0xc0])
 const NULL_RLP = new Uint8Array([0x80])
 
-import { str2bin, trimLeadingZeros } from "./utils"
+import {hex2bin, str2bin, trimLeadingZeros} from "./utils"
 import BN = require('./bn')
 
 
@@ -27,24 +27,12 @@ function isBytes(s: any): boolean {
 }
 
 /**
- * convert uint8array or array buffer to uint8 array
- * @param {Uint8Array | ArrayBuffer} data
- * @returns {Uint8Array}
- */
-export function toU8Arr(data: Uint8Array | ArrayBuffer): Uint8Array {
-    assert(isBytes(data), `${data} is not uint8array or arraybuffer`)
-    if (data instanceof ArrayBuffer)
-        return new Uint8Array(data)
-    return data
-}
-
-/**
  * 字节数组转 number
  * @param {Uint8Array | ArrayBuffer} bytes
  * @returns {number}
  */
 export function byteArrayToInt(bytes: ArrayBuffer | Uint8Array): number {
-    let arr = toU8Arr(bytes)
+    let arr = hex2bin(bytes)
     let ret = 0;
     for (let i = 0; i < arr.length; i++) {
         const u = arr[arr.length - i - 1];

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RLPList = exports.decodeElements = exports.decode = exports.encode = exports.encodeString = exports.encodeElements = exports.numberToByteArray = exports.byteArrayToInt = exports.toU8Arr = void 0;
+exports.RLPList = exports.decodeElements = exports.decode = exports.encode = exports.encodeString = exports.encodeElements = exports.numberToByteArray = exports.byteArrayToInt = void 0;
 var OFFSET_SHORT_ITEM = 0x80;
 var SIZE_THRESHOLD = 56;
 var OFFSET_LONG_ITEM = 0xb7;
@@ -19,24 +19,12 @@ function isBytes(s) {
     return s instanceof Uint8Array || s instanceof ArrayBuffer;
 }
 /**
- * convert uint8array or array buffer to uint8 array
- * @param {Uint8Array | ArrayBuffer} data
- * @returns {Uint8Array}
- */
-function toU8Arr(data) {
-    assert(isBytes(data), data + " is not uint8array or arraybuffer");
-    if (data instanceof ArrayBuffer)
-        return new Uint8Array(data);
-    return data;
-}
-exports.toU8Arr = toU8Arr;
-/**
  * 字节数组转 number
  * @param {Uint8Array | ArrayBuffer} bytes
  * @returns {number}
  */
 function byteArrayToInt(bytes) {
-    var arr = toU8Arr(bytes);
+    var arr = utils_1.hex2bin(bytes);
     var ret = 0;
     for (var i = 0; i < arr.length; i++) {
         var u = arr[arr.length - i - 1];

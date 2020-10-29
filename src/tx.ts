@@ -95,7 +95,7 @@ export class Transaction implements Encoder {
             convert(this.gasPrice || '0', ABI_DATA_TYPE.u256),
             convert(this.amount || '0', ABI_DATA_TYPE.u256),
             convert(this.payload || '', ABI_DATA_TYPE.bytes),
-            convert(this.to || '', ABI_DATA_TYPE.address)
+            (this.to && this.to.length) ? convert(this.to, ABI_DATA_TYPE.address) : ''
         ]
     }
 

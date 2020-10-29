@@ -4,12 +4,6 @@ export interface Encoder {
     getEncoded(): Uint8Array;
 }
 /**
- * convert uint8array or array buffer to uint8 array
- * @param {Uint8Array | ArrayBuffer} data
- * @returns {Uint8Array}
- */
-export declare function toU8Arr(data: Uint8Array | ArrayBuffer): Uint8Array;
-/**
  * 字节数组转 number
  * @param {Uint8Array | ArrayBuffer} bytes
  * @returns {number}
