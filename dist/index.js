@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createAuthServer = exports.readKeyStore = exports.randomBytes = exports.createKeyStore = exports.generatePrivateKey = exports.sign = exports.uuidv4 = exports.bin2str = exports.bin2hex = exports.hex2bin = exports.str2bin = exports.publicKey2Address = exports.privateKey2PublicKey = exports.TX_STATUS = exports.constants = exports.ABI = exports.TypeDef = exports.getContractAddress = exports.compileABI = exports.compileContract = exports.Contract = exports.rlp = exports.TransactionBuilder = exports.RPC = exports.Transaction = void 0;
+exports.BN = exports.createAuthServer = exports.readKeyStore = exports.randomBytes = exports.createKeyStore = exports.generatePrivateKey = exports.sign = exports.uuidv4 = exports.bin2str = exports.bin2hex = exports.hex2bin = exports.str2bin = exports.publicKey2Address = exports.privateKey2PublicKey = exports.TX_STATUS = exports.constants = exports.ABI = exports.TypeDef = exports.getContractAddress = exports.compileABI = exports.compileContract = exports.Contract = exports.rlp = exports.TransactionBuilder = exports.RPC = exports.Transaction = void 0;
 var tx_1 = require("./tx");
 Object.defineProperty(exports, "Transaction", { enumerable: true, get: function () { return tx_1.Transaction; } });
 var rpc_1 = require("./rpc");
@@ -32,3 +32,5 @@ Object.defineProperty(exports, "createKeyStore", { enumerable: true, get: functi
 Object.defineProperty(exports, "randomBytes", { enumerable: true, get: function () { return utils_1.randomBytes; } });
 Object.defineProperty(exports, "readKeyStore", { enumerable: true, get: function () { return utils_1.readKeyStore; } });
 Object.defineProperty(exports, "createAuthServer", { enumerable: true, get: function () { return utils_1.createAuthServer; } });
+var BN = require("./bn");
+exports.BN = BN;
