@@ -292,9 +292,9 @@ const tx = builder.buildCancelVote('c2458cad4c838b81b49500d9268b352b03cd1b78423c
  * erc 20 example in assembly script
  */
 
-import { Util, U256, Globals, ABI_DATA_TYPE, ___idof} from '../lib'
-import { Store } from '../lib'
-import { Context, Address } from '../lib'
+import { Util, U256, Globals, ABI_DATA_TYPE, ___idof} from './node_modules/@salaku/js-sdk/lib'
+import { Store } from './node_modules/@salaku/js-sdk/lib'
+import { Context, Address } from './node_modules/@salaku/js-sdk/lib'
 
 const _balance = Store.from<Address, U256>('balance');
 const _freeze = Store.from<Address, U256>('freeze');
