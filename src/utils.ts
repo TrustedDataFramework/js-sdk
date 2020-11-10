@@ -370,7 +370,7 @@ export function toSafeInt(x: string | number | BN | ArrayBuffer | Uint8Array): s
         bn = x
     if (bn.cmp(MAX_SAFE_INTEGER) <= 0 && bn.cmp(MIN_SAFE_INTEGER) >= 0)
         return bn.toNumber()
-    return x.toString(10)
+    return bn.toString(10)
 }
 
 export function uuidv4() {
