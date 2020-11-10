@@ -488,6 +488,17 @@ export function createKeyStore(password: string, privateKey?: Binary): KeyStore 
 
 
 export function readKeyStore(ks: KeyStore, password: string): string {
+    // validate password
+    let salt = hex2bin(ks.crypto.salt)
+    let k = hex2bin(
+        sm3(
+            concatBytes(salt, str2bin(password))
+        )
+    )
+    k = k.slice(0, 16)
+    let mac = sm3(concatBytes(k, hex2bin(ks.crypto.cipherText)))
+    if(mac !== ks.mac)
+        throw new Error('read private from keystore failed: incorrect password')
     if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
         throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
     }
