@@ -338,6 +338,10 @@ export class RPC {
             let included = false
 
             this.__observe(tx.getHash(), (r: TransactionResp) => {
+                if(r.status === TX_STATUS.PENDING && status === TX_STATUS.PENDING){
+                    resolve({transactionHash: r.hash})
+                    return
+                }
                 if (r.status === TX_STATUS.DROPPED) {
                     const e = { hash: r.hash, reason: r.reason }
                     reject(e)

@@ -1,4 +1,4 @@
-import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt } from "./utils";
+import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin } from "./utils";
 import {
     ABI_DATA_TYPE,
     ABI_TYPE,
@@ -13,32 +13,81 @@ import {
 import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
 import BN = require("./bn");
+import { OutputStream } from 'assemblyscript/cli/asc'
 
-import child_process = require('child_process')
 import Dict = NodeJS.Dict
 
-export function compileContract(ascPath: string, src: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array> {
-    let cmd = ascPath + ' ' + src + ' -b ' // 执行的命令
-    if (opts && opts.debug)
-        cmd += ' --debug '
-    if (opts && opts.optimize)
-        cmd += ' --optimize '
-    return new Promise((resolve, reject) => {
-        child_process.exec(
-            cmd,
-            { encoding: 'buffer' },
-            (err, stdout, stderr) => {
-                if (err) {
-                    // err.code 是进程退出时的 exit code，非 0 都被认为错误
-                    // err.signal 是结束进程时发送给它的信号值
-                    reject(stderr.toString('ascii'))
-                }
-                resolve(stdout)
-            }
-        );
-    })
+class MemoryOutputStream implements OutputStream {
+    buf: Uint8Array
+
+    constructor() {
+        this.buf = new Uint8Array()
+    }
+
+    write(chunk: string | Uint8Array): void {
+        if (typeof chunk === 'string')
+            this.buf = concatBytes(this.buf, str2bin(chunk))
+        else
+            this.buf = concatBytes(this.buf, chunk)
+    }
 }
 
+export async function compileContract(ascPath?: string, src?: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array> {
+    if (typeof ascPath === 'string' && typeof src === 'string') {
+        const child_process = require('child_process')
+        let cmd = ascPath + ' ' + src + ' -b ' // 执行的命令
+        if (opts && opts.debug)
+            cmd += ' --debug '
+        if (opts && opts.optimize)
+            cmd += ' --optimize '
+        return new Promise((rs, rj) => {
+            child_process.exec(
+                cmd,
+                { encoding: 'buffer' },
+                (err, stdout, stderr) => {
+                    if (err) {
+                        // err.code 是进程退出时的 exit code，非 0 都被认为错误
+                        // err.signal 是结束进程时发送给它的信号值
+                        rj(stderr.toString('ascii'))
+                        return
+                    }
+                    rs(stdout)
+                }
+            )
+        })
+    }
+    const asc = require("assemblyscript/cli/asc")
+    if (typeof src !== 'string') {
+        src = ascPath
+    }
+    if (typeof src !== 'string')
+        throw new Error('invalid source file ' + src)
+    const arr = [
+        src,
+        "-b"
+    ]
+    const stdout = new MemoryOutputStream()
+    const stderr = new MemoryOutputStream()
+
+    if (opts && opts.debug)
+        arr.push('--debug')
+    if (opts && opts.optimize)
+        arr.push('--optimize')
+
+    await asc.ready
+    return new Promise((rs, rj) => {
+        asc.main(arr, {
+            stdout: stdout,
+            stderr: stderr
+        }, function (err) {
+            if (err) {
+                rj(bin2str(stderr.buf))
+                return
+            }
+            rs(stdout.buf)
+        })
+    })
+}
 
 export class TypeDef {
     type: string
