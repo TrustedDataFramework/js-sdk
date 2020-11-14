@@ -328,6 +328,43 @@ class RLPParser {
     }
 }
 
+export class RLPListReader{
+    li: RLPList
+    idx: number
+    constructor(li: RLPList) {
+        this.li = li
+        this.idx = 0
+    }
+
+    list(): RLPList {
+        return RLPList.fromEncoded(this.raw())
+    }
+
+    length(): number {
+        return this.li.length()
+    }
+
+    raw(): ArrayBuffer {
+        return this.li.elements[this.idx++];
+    }
+
+    number(): number {
+        return byteArrayToInt(this.bytes())
+    }
+
+    bool(): boolean {
+        return this.number() != 0
+    }
+
+    bytes(): Uint8Array {
+        return <Uint8Array>decode(this.li.elements[this.idx++])
+    }
+
+    string(): string{
+        return bin2str(this.bytes())
+    }
+}
+
 export class RLPList {
     static EMPTY: RLPList = new RLPList([]);
 
