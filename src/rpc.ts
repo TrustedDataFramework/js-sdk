@@ -2,7 +2,6 @@ import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeInt, uuidv4 } from 
 import rlp = require("./rlp")
 import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS } from "./constants";
 import { Contract, normalizeParams } from "./contract";
-import Dict = NodeJS.Dict;
 import { Transaction } from "./tx";
 import BN = require('./bn')
 
@@ -13,11 +12,11 @@ export interface TransactionResult {
     blockHeight?: number | string
     blockHash?: string
     gasUsed?: string | number
-    events?: Readable[] | Dict<Readable>
+    events?: Readable[] | Record<string, Readable>
     result?: Readable
     fee?: string | number
     method?: string
-    inputs?: AbiInput[] | Dict<AbiInput>
+    inputs?: AbiInput[] | Record<string, AbiInput>
 }
 
 interface Resp {
@@ -213,7 +212,7 @@ export class RPC {
     }
 
 
-    private __listen(contract: Contract, event: string, func: (r: Dict<Readable>) => void) {
+    private __listen(contract: Contract, event: string, func: (r: Record<string, Readable>) => void) {
         const addr = hex2bin(contract.address)
         this.wsRPC(WS_CODES.EVENT_SUBSCRIBE, addr)
         const id = ++this.cid
@@ -221,7 +220,7 @@ export class RPC {
         this.id2key.set(id, key)
         const fn = (r: EventResp | TransactionResp) => {
             let resp = <EventResp>r
-            const abiDecoded = <Dict<Readable>>contract.abiDecode(resp.name, <Uint8Array[]>resp.fields, 'event')
+            const abiDecoded = <Record<string, Readable>>contract.abiDecode(resp.name, <Uint8Array[]>resp.fields, 'event')
             func(abiDecoded)
         }
         if (!this.eventHandlers.has(key))
@@ -235,7 +234,7 @@ export class RPC {
     /**
      * 监听合约事件
      */
-    listen(contract, event): Promise<Dict<Readable>> {
+    listen(contract, event): Promise<Record<string, Readable>> {
         return new Promise((rs, rj) => {
             this.__listen(contract, event, rs)
         })
@@ -265,7 +264,7 @@ export class RPC {
         }
     }
 
-    listenOnce(contract: Contract, event: string): Promise<Dict<Readable>> {
+    listenOnce(contract: Contract, event: string): Promise<Record<string, Readable>> {
         const id = this.cid + 1
         return this.listen(contract, event).then((r) => {
             this.removeListener(id)
@@ -301,7 +300,7 @@ export class RPC {
     /**
      * 查看合约方法
      */
-    viewContract(contract: Contract, method: string, parameters): Promise<Readable | Readable[] | Dict<Readable>> {
+    viewContract(contract: Contract, method: string, parameters): Promise<Readable | Readable[] | Record<string, Readable>> {
         parameters = normalizeParams(parameters)
         const addr = contract.address
         const params = contract.abiEncode(method, parameters)

@@ -6,7 +6,6 @@ import rlp = require('./rlp')
 import BN = require('./bn')
 import { Encoder } from "./rlp";
 import { ABI, Contract } from './contract'
-import Dict = NodeJS.Dict
 
 // 2020-10-25T09:57:15+08:00
 const OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/.compile()
@@ -25,8 +24,8 @@ export class Transaction implements Encoder {
     to: string
     signature: string
     __abi?: ABI[]
-    __inputs?: Readable[] | Dict<Readable>
-    constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: Binary, gasLimit?: Digital, gasPrice?: Digital, amount?: Digital, payload?: Binary, to?: Binary, signature?: Binary, __abi?: ABI[], __inputs?: Readable[] | Dict<Readable>) {
+    __inputs?: Readable[] | Record<string, Readable>
+    constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: Binary, gasLimit?: Digital, gasPrice?: Digital, amount?: Digital, payload?: Binary, to?: Binary, signature?: Binary, __abi?: ABI[], __inputs?: Readable[] | Record<string, Readable>) {
         // @ts-ignore
         if (typeof createdAt === 'string' && OFFSET_DATE.test(createdAt)) {
             try {
@@ -100,7 +99,7 @@ export class Transaction implements Encoder {
     }
 
     // convert AbiInput to readable
-    __setInputs(__inputs: AbiInput[] | Dict<AbiInput>) {
+    __setInputs(__inputs: AbiInput[] | Record<string, AbiInput>) {
         const cnv: (i: AbiInput) => Readable = (x: AbiInput) => {
             if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                 return bin2hex(x)
@@ -120,7 +119,7 @@ export class Transaction implements Encoder {
             const c = new Contract('', this.__abi)
             const a = c.getABI(this.getMethod(), 'function')
             if (a.inputsObj()) {
-                this.__inputs = <Dict<Readable>>a.toObj(this.__inputs, true)
+                this.__inputs = <Record<string, Readable>>a.toObj(this.__inputs, true)
             }
         }
     }

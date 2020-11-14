@@ -4,7 +4,6 @@ import { Transaction } from "./tx"
 import { bin2hex, convert, dig2str, privateKey2PublicKey, assert } from "./utils"
 import { Contract, normalizeParams } from './contract'
 import rlp = require('./rlp')
-import Dict = NodeJS.Dict;
 
 export class TransactionBuilder {
     version: string
@@ -48,7 +47,7 @@ export class TransactionBuilder {
      * @param parameters 合约的构造器参数
      * @param amount 
      */
-    buildDeploy(contract: Contract, parameters?: AbiInput | AbiInput[] | Dict<AbiInput>, amount?: Digital): Transaction {
+    buildDeploy(contract: Contract, parameters?: AbiInput | AbiInput[] | Record<string, AbiInput>, amount?: Digital): Transaction {
 
         assert(contract.binary && contract.binary instanceof Uint8Array, 'contract binary is not uint8 array')
         assert(contract.abi, 'missing contract abi')
@@ -74,7 +73,7 @@ export class TransactionBuilder {
      * @param parameters 方法参数
      * @param amount 金额
      */
-    buildContractCall(contract: Contract, method: string, parameters?: AbiInput | AbiInput[] | Dict<AbiInput>, amount?: Digital): Transaction {
+    buildContractCall(contract: Contract, method: string, parameters?: AbiInput | AbiInput[] | Record<string, AbiInput>, amount?: Digital): Transaction {
         if (!contract.abi)
             throw new Error('missing contract abi')
         if (!contract.address)

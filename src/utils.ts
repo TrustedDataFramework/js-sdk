@@ -3,7 +3,6 @@ import { ABI_DATA_TYPE, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, M
 import BN = require('./bn')
 import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
 import { Transaction } from "./tx";
-import Dict = NodeJS.Dict;
 import { Server } from "http";
 
 export function bytesToF64(buf: Uint8Array): number {
@@ -380,7 +379,7 @@ export function uuidv4() {
     });
 }
 
-export function sign(tx: Dict<AbiInput>, sk: Binary): Object {
+export function sign(tx: Record<string, AbiInput>, sk: Binary): Object {
     const t = Transaction.clone(tx)
     t.sign(sk)
     tx.signature = t.signature
