@@ -1,4 +1,5 @@
 import { RLPElement } from "./constants";
+import { bin2str } from './utils'
 
 const OFFSET_SHORT_ITEM = 0x80;
 const SIZE_THRESHOLD = 56;
@@ -365,5 +366,9 @@ export class RLPList {
 
     bytes(idx: number): Uint8Array {
         return <Uint8Array>decode(this.elements[idx])
+    }
+
+    string(idx: number): string{
+        return bin2str(this.bytes(idx))
     }
 }
