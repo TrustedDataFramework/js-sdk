@@ -51,7 +51,7 @@ export enum WS_CODES {
     TRANSACTION_SUBSCRIBE,
     TRANSACTION_SEND,
     ACCOUNT_QUERY,
-    CONTRACT_QUERY
+    CONTRACT_QUERY,
 }
 
 export class RPC {
@@ -413,12 +413,12 @@ export class RPC {
         const n = this.nonce
         const ret: Promise<Resp> = new Promise((rs, rj) => {
             this.rpcCallbacks.set(n, rs)
-            setTimeout(() => rj('websocket rpc timeout'), 30 * 1000)
         })
         this.tryConnect()
             .then(() => {
                 const encoded = rlp.encode([n, code, data])
-                this.ws.send(encoded)
+                if(this.ws)
+                    this.ws.send(encoded)
             })
         return ret
     }
@@ -426,16 +426,13 @@ export class RPC {
 
     sendAndObserve(tx: Transaction | Transaction[], status?: TX_STATUS, timeout?: number): Promise<TransactionResult> {
         let ret
-        let p
-        let sub
+        let sub: Promise<Resp>
         if (Array.isArray(tx)) {
-            p = []
             const arr = []
             sub = this.wsRPC(WS_CODES.TRANSACTION_SUBSCRIBE, tx.map(t => hex2bin(t.getHash())))
             for (const t of tx) {
                 arr.push(this.observe(t, status, timeout))
             }
-            p = Promise.all(p)
             ret = Promise.all(arr)
         } else {
             sub = this.wsRPC(WS_CODES.TRANSACTION_SUBSCRIBE, hex2bin(tx.getHash()))
