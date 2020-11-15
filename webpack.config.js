@@ -1,8 +1,8 @@
 const path = require("path");
 
-module.exports = {
-  // mode: 'development',
-  // devtool: 'inline-source-map',
+module.exports = (env = {}) => ({
+  mode: env.prod ? 'production' : 'development',
+  devtool: env.prod ? 'source-map' : 'inline-source-map',
   entry: path.join(__dirname, "src/index.ts"),
   output: {
     path: path.join(__dirname, "dist"),
@@ -43,4 +43,4 @@ module.exports = {
     ws: "WebSocket",
     "assemblyscript/cli/asc": 'commonjs2 assemblyscript/cli/asc',
   },
-};
+})
