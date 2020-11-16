@@ -1,9 +1,9 @@
 import BN = require("./bn")
 
-export type Digital = string | number | BN
+export type Digital = string | number | BN | BigInt
 export type Binary = string | Uint8Array | ArrayBuffer
 export type Readable = string | number | boolean
-export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | BN
+export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | BN | BigInt
 export type RLPElement = Uint8Array | Uint8Array[]
 
 export enum TX_STATUS {

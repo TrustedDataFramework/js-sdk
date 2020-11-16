@@ -103,7 +103,7 @@ export class Transaction implements Encoder {
         const cnv: (i: AbiInput) => Readable = (x: AbiInput) => {
             if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                 return bin2hex(x)
-            if (x instanceof BN)
+            if (typeof x === 'bigint' || x instanceof BN || x instanceof BigInt)
                 return toSafeInt(x)
             return x
         }

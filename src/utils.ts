@@ -178,10 +178,11 @@ export function bin2str(bin: Uint8Array | ArrayBuffer | string) {
 }
 
 // convert before rlp encode
-export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boolean, type: ABI_DATA_TYPE): Uint8Array | string | BN {
+export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boolean | BigInt, type: ABI_DATA_TYPE): Uint8Array | string | BN {
     if (o instanceof ArrayBuffer)
         o = new Uint8Array(o)
-
+    if(typeof o === 'bigint')
+        o = new BN(o.toString())
     if (o instanceof Uint8Array) {
         switch (type) {
             case ABI_DATA_TYPE.bool:
@@ -352,8 +353,10 @@ export function convert(o: string | Uint8Array | number | BN | ArrayBuffer | boo
 }
 
 
-export function toSafeInt(x: string | number | BN | ArrayBuffer | Uint8Array): string | number {
+export function toSafeInt(x: string | number | BN | ArrayBuffer | Uint8Array | BigInt): string | number {
     let bn: BN
+    if(typeof x === 'bigint' || x instanceof BigInt)
+        x = new BN(x.toString())
     if (typeof x === 'number')
         return x
     if (typeof x === 'string') {
