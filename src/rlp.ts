@@ -189,6 +189,10 @@ export function encodeString(s: string): Uint8Array {
     return encodeBytes(str2bin(s))
 }
 
+/**
+ * rlp 编码，参数必须是字符串、正整数、零、null、字节流 数组类型
+ * @param o
+ */
 export function encode(o: string | any[] | number | null | Uint8Array | ArrayBuffer | Encoder | boolean | bigint): Uint8Array {
     if (o && (typeof (<Encoder>o).getEncoded === 'function')) {
         return (<Encoder>o).getEncoded()

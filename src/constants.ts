@@ -63,6 +63,10 @@ export const constants = {
      * POS 共识的版本号
      */
     POS_VERSION: 7368563,
+
+    /**
+     * 
+     */
     COINBASE: 0,
     TRANSFER: 1,
     DEPLOY: 2,

@@ -105,12 +105,10 @@ export class Transaction implements Encoder {
     }
 
     // convert AbiInput to readable
-    __setInputs(__inputs: AbiInput[] | Record<string, AbiInput>) {
+    __setInputs(__inputs: AbiInput[] | Record<string, AbiInput>): void {
         const cnv: (i: AbiInput) => Readable = (x: AbiInput) => {
             if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                 return bin2hex(x)
-            if (typeof x === 'bigint')
-                return toSafeInt(x)
             return x
         }
         if (Array.isArray(__inputs)) {

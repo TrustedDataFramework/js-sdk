@@ -3,6 +3,7 @@ import { ABI_DATA_TYPE, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, M
 import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
 import { Transaction } from "./tx"
 import { Server } from 'http'
+import BN = require("./bn");
 
 const UTF8Decoder =  new TextDecoder('utf-8')
 
@@ -419,13 +420,15 @@ export function decodeBE(x: ArrayBuffer | Uint8Array): bigint{
  * @param bits 
  */
 export function encodeBE(x: number | BigInt, bits?: number): Uint8Array{
+    if(x === 0 || x === ZERO)
+        return new Uint8Array(0)
     let str = x.toString(16)
-    str = str.length % 2 == 0 ? str : '0' + str
+    str = str.length % 2 === 0 ? str : '0' + str
     let arr = hex2bin(str)
     if(bits === undefined)
         return arr
     let bytes = bits / 8
-    if(Number.isInteger(bytes) || bytes < 0)    
+    if(Number.isInteger(bytes) && bytes < 0)
         throw new Error(`invalid bits number ${bits}, should be positive and `)
     if(arr.length > bytes)
         throw new Error('encode failed, overflow')

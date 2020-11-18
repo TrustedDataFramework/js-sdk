@@ -58,12 +58,13 @@ export class TransactionBuilder {
 
         const binary = contract.binary
 
-        let encoded = contract.abi.filter(x => x.name === 'init').length > 0 ?
+        let hasConstructor = contract.abi.filter(x => x.name === 'init').length > 0
+        let encoded = hasConstructor ?
             contract.abiEncode('init', parameters) : [[], [], []]
 
         const ret = this.buildCommon(constants.DEPLOY, amount, rlp.encode([binary, encoded, contract.abiToBinary()]), '')
         ret.__abi = contract.abi
-        ret.__setInputs(parameters)
+        hasConstructor && ret.__setInputs(parameters)
         return ret
     }
 
