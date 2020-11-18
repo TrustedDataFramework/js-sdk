@@ -7,6 +7,12 @@
 npm install --save @salaku/js-sdk
 ```
 
+## TODO:
+
+1. 用内置的 bigint 替代 bn.js
+2. lib 下的内建对象使用 assemblyscript runtime
+3. 在内部关于数值类型统一使用 bigint 替代 string
+
 ## 基本使用
 
 ### 常量

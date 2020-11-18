@@ -1,4 +1,4 @@
-import { U256, Address, log } from '.'
+import { U256, Address} from '.'
 import { Util } from './util';
 const OFFSET_SHORT_LIST: u8 = 0xc0;
 

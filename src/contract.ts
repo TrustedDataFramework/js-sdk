@@ -1,4 +1,4 @@
-import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin } from "./utils";
+import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE } from "./utils";
 import {
     ABI_DATA_TYPE,
     ABI_TYPE,
@@ -8,11 +8,11 @@ import {
     MAX_U256,
     MAX_U64,
     ONE,
-    Readable
+    Readable,
+    ZERO
 } from "./constants";
 import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
-import BN = require("./bn");
 import { OutputStream } from 'assemblyscript/cli/asc'
 
 class MemoryOutputStream implements OutputStream {
@@ -30,6 +30,12 @@ class MemoryOutputStream implements OutputStream {
     }
 }
 
+/**
+ * 编译合约得到编译后的二进制流
+ * @param ascPath 编译器的路径，一般位于 node_modules/.bin/asc
+ * @param src 合约主文件
+ * @param opts 可选项
+ */
 export async function compileContract(ascPath?: string, src?: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array> {
     if (typeof ascPath === 'string' && typeof src === 'string') {
         const child_process = require('child_process')
@@ -159,14 +165,23 @@ export class ABI {
     }
 }
 
+/**
+ * 用于处理用户输入的参数可能为空，也可能是单个输入值、数组或者对象的多种情况
+ * @param params 
+ */
 export function normalizeParams(params?: AbiInput | AbiInput[] | Record<string, AbiInput>): AbiInput[] | Record<string, AbiInput> {
     if (params === null || params === undefined)
         return []
-    if (typeof params === 'bigint' || params instanceof BigInt || typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array || params instanceof BN)
+    if (typeof params === 'bigint' || typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array)
         return [params]
     return params
 }
 
+/**
+ * 从服务端返回的二进制内容中解析成可读的 javascript 类型
+ * @param outputs abi 中的 outputs 数组，包含了类型，如果 outputs 数组中的每个 TypeDef 的 name 都有值，会返回一个 JSON 对象，否则返回一个数组
+ * @param buf 
+ */
 function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | Record<string, Readable> {
     buf = buf || []
     const len = buf.length
@@ -174,6 +189,8 @@ function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | Record<
         return []
 
     const arr = buf
+
+
     const returnObject =
         outputs.every(v => v.name) && (
             (new Set(outputs.map(v => v.name))).size === outputs.length
@@ -195,24 +212,24 @@ function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | Record<
             }
             case 'u256':
             case 'u64': {
-                const n = new BN(arr[i])
+                const n = decodeBE(arr[i])
                 if (t === 'u64')
-                    assert(n.cmp(MAX_U64) <= 0, `${n.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
+                    assert(n <= MAX_U64, `${n.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
                 if (t === 'u256')
-                    assert(n.cmp(MAX_U256) <= 0, `${n.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
+                    assert(n <= MAX_U256, `${n.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                 val = toSafeInt(n)
                 break
             }
             case 'i64': {
-                let n
+                let n: bigint
                 const padded = padPrefix(arr[i], 0, 8)
-                const isneg = padded[0] & 0x80;
+                const isneg = padded[0] & 0x80
                 if (!isneg) {
-                    n = new BN(arr[i])
+                    n = decodeBE(arr[i])
                 } else {
-                    n = new BN(inverse(padded))
-                    n = n.add(ONE)
-                    n = n.neg()
+                    n = decodeBE(inverse(padded))
+                    n = n + ONE
+                    n = - n
                 }
                 val = toSafeInt(n)
                 break
@@ -254,12 +271,19 @@ export class Contract {
     }
 
 
-    abiEncode(name: string, li?: AbiInput | AbiInput[] | Record<string, AbiInput>): [ABI_DATA_TYPE[], Array<string | Uint8Array | BN>, ABI_DATA_TYPE[]] {
+    /**
+     * abi 编码，将 javascript 输入转换可以被 rlp 编码数组 [输入类型[], 输入[], 输出类型[]]
+     * @param name 方法名称
+     * @param li 
+     */
+    abiEncode(name: string, li?: AbiInput | AbiInput[] | Record<string, AbiInput>): [ABI_DATA_TYPE[], Array<string | Uint8Array | bigint | number>, ABI_DATA_TYPE[]] {
         const func = this.getABI(name, 'function')
+
+        // 得到返回类型
         let retType = func.outputs && func.outputs[0] && func.outputs[0].type
         const retTypes = retType ? [ABI_DATA_TYPE[retType]] : []
 
-        if (typeof li === 'string' || typeof li === 'number' || li instanceof BN || li instanceof ArrayBuffer || li instanceof Uint8Array || typeof li === 'boolean')
+        if (typeof li === 'string' || typeof li === 'number' || li instanceof ArrayBuffer || li instanceof Uint8Array || typeof li === 'boolean' || typeof li === 'bigint')
             return this.abiEncode(name, [li])
 
         if (li === undefined || li === null)
@@ -267,7 +291,7 @@ export class Contract {
 
 
         if (Array.isArray(li)) {
-            const arr = []
+            const arr: Array<string | Uint8Array | bigint | number> = []
             const types = []
             if (li.length != func.inputs.length)
                 throw new Error(`abi encode failed for ${func.name}, expect ${func.inputs.length} parameters while ${li.length} found`)
@@ -278,7 +302,7 @@ export class Contract {
             return [types, arr, retTypes]
         }
 
-        const arr = []
+        const arr: Array<string | Uint8Array | bigint | number> = []
         const types = []
         for (let i = 0; i < func.inputs.length; i++) {
             const input = func.inputs[i]
@@ -306,6 +330,9 @@ export class Contract {
     }
 
 
+    /**
+     * 将 abi 转成可以 rlp 编码的格式，用于放到合约部署的 payload 当中
+     */
     abiToBinary(): any[] {
         const ret = []
         for (let a of this.abi) {
@@ -321,6 +348,11 @@ export class Contract {
         return ret
     }
 
+    /**
+     * 找到和 名称、类型对应的 abi，有且只有一个
+     * @param name 
+     * @param type 
+     */
     getABI(name: string, type: ABI_TYPE): ABI {
         const funcs = this.abi.filter(x => x.type === type && x.name === name)
         assert(funcs.length === 1, `exact exists one and only one abi ${name}, while found ${funcs.length}`)
@@ -328,9 +360,12 @@ export class Contract {
     }
 }
 
+/**
+ * 编译生成 abi JSON 文件
+ * @param str 源代码文件的字符串
+ */
 export function compileABI(str: Binary): ABI[] {
-    let s = str instanceof Uint8Array || str instanceof ArrayBuffer ?
-        bin2str(str) : str
+    let s = bin2str(str)
 
     const TYPES = {
         u64: 'u64',

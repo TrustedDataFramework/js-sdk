@@ -1,20 +1,26 @@
 import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeInt, uuidv4 } from "./utils"
 import rlp = require("./rlp")
-import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS } from "./constants";
+import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS } from "./constants"
 import { Contract, normalizeParams } from "./contract";
 import { Transaction } from "./tx";
-import BN = require('./bn')
 
-
+export interface Account { 
+    address: string 
+    nonce: number | bigint
+    balance: number | bigint
+    createdBy: string
+    contractHash: string
+    storageRoot: string 
+}
 
 export interface TransactionResult {
     transactionHash?: string
-    blockHeight?: number | string
+    blockHeight?: number | bigint
     blockHash?: string
-    gasUsed?: string | number
+    gasUsed?: bigint | number
     events?: Readable[] | Record<string, Readable>
     result?: Readable
-    fee?: string | number
+    fee?: bigint | number
     method?: string
     inputs?: AbiInput[] | Record<string, AbiInput>
 }
@@ -35,9 +41,9 @@ interface TransactionResp extends Resp {
     hash: string
     status: TX_STATUS
     reason?: string
-    blockHeight?: number | string
+    blockHeight?: number | bigint
     blockHash?: string
-    gasUsed?: string | number
+    gasUsed?: bigint | number
     events?: [Uint8Array, Uint8Array[]][]
     result?: Uint8Array[]
 }
@@ -325,7 +331,6 @@ export class RPC {
         status = status === undefined ? TX_STATUS.CONFIRMED : status
         return new Promise((resolve, reject) => {
             let success = false
-
             if (timeout)
                 setTimeout(() => {
                     if (success) return
@@ -337,8 +342,8 @@ export class RPC {
             let included = false
 
             this.__observe(tx.getHash(), (r: TransactionResp) => {
-                if(r.status === TX_STATUS.PENDING && status === TX_STATUS.PENDING){
-                    resolve({transactionHash: r.hash})
+                if (r.status === TX_STATUS.PENDING && status === TX_STATUS.PENDING) {
+                    resolve({ transactionHash: r.hash })
                     return
                 }
                 if (r.status === TX_STATUS.DROPPED) {
@@ -385,7 +390,7 @@ export class RPC {
                     }
 
                     ret.transactionHash = tx.getHash()
-                    ret.fee = toSafeInt((new BN(tx.gasPrice).mul(new BN(ret.gasUsed))))
+                    ret.fee = toSafeInt((BigInt(tx.gasPrice) * BigInt(ret.gasUsed)))
                     if (tx.isDeployOrCall() && !tx.isBuiltInCall()) {
                         ret.method = tx.getMethod()
                         ret.inputs = tx.__inputs
@@ -416,7 +421,7 @@ export class RPC {
         this.tryConnect()
             .then(() => {
                 const encoded = rlp.encode([n, code, data])
-                if(this.ws)
+                if (this.ws)
                     this.ws.send(encoded)
             })
         return ret
@@ -478,7 +483,7 @@ export class RPC {
      * @returns {Promise<Object>}
      */
     getAccount(pkOrAddress):
-        Promise<{ address: string, nonce: number | string, balance: number | string, createdBy: string, contractHash: string, storageRoot: string }> {
+        Promise<Account> {
         let d = hex2bin(pkOrAddress)
         if (d.length != 20)
             d = hex2bin(publicKey2Address(d))

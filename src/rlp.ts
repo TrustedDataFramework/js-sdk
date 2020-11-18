@@ -1,5 +1,5 @@
 import { RLPElement } from "./constants";
-import { bin2str } from './utils'
+import { bin2str, encodeBE } from './utils'
 
 const OFFSET_SHORT_ITEM = 0x80;
 const SIZE_THRESHOLD = 56;
@@ -10,8 +10,7 @@ const EMPTY_BYTES = new Uint8Array(0);
 const EMPTY_RLP_ARRAY = new Uint8Array([0xc0])
 const NULL_RLP = new Uint8Array([0x80])
 
-import {hex2bin, str2bin, trimLeadingZeros} from "./utils"
-import BN = require('./bn')
+import {hex2bin, str2bin} from "./utils"
 
 
 export interface Encoder {
@@ -190,9 +189,7 @@ export function encodeString(s: string): Uint8Array {
     return encodeBytes(str2bin(s))
 }
 
-export function encode(o: string | any[] | number | null | BN | Uint8Array | ArrayBuffer | Encoder | boolean | BigInt): Uint8Array {
-    if(typeof o === 'bigint')
-        o = new BN(o.toString())
+export function encode(o: string | any[] | number | null | Uint8Array | ArrayBuffer | Encoder | boolean | bigint): Uint8Array {
     if (o && (typeof (<Encoder>o).getEncoded === 'function')) {
         return (<Encoder>o).getEncoded()
     }
@@ -210,8 +207,8 @@ export function encode(o: string | any[] | number | null | BN | Uint8Array | Arr
         return o ? new Uint8Array([0x01]) : NULL_RLP
     if (o instanceof Uint8Array)
         return encodeBytes(o)
-    if (o instanceof BN) {
-        return encodeBytes(trimLeadingZeros(o.toArrayLike(Uint8Array, 'be')))
+    if (typeof o === 'bigint') {
+        return encodeBytes(encodeBE(o))
     }
     if (Array.isArray(o)) {
         const elements = o.map(x => encode(x))

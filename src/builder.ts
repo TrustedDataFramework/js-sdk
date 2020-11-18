@@ -1,16 +1,18 @@
-import BN = require("./bn")
-import { ABI_DATA_TYPE, Digital, ONE, constants, Binary, AbiInput } from "./constants"
-import { Transaction } from "./tx"
-import { bin2hex, convert, dig2str, privateKey2PublicKey, assert } from "./utils"
+import { Digital, ONE, constants, Binary, AbiInput } from './constants'
+import { Transaction } from './tx'
+import { bin2hex, dig2str, privateKey2PublicKey, assert, toSafeInt, toBigN } from './utils'
 import { Contract, normalizeParams } from './contract'
 import rlp = require('./rlp')
 
+/**
+ * 事务构造工具
+ */
 export class TransactionBuilder {
-    version: string
+    version: number
     sk: string
-    gasLimit: string
-    gasPrice: string
-    nonce: string
+    gasLimit: bigint | number
+    gasPrice: bigint | number
+    nonce: bigint | number
 
     constructor(
         version?: Digital,
@@ -19,17 +21,16 @@ export class TransactionBuilder {
         gasPrice?: Digital,
         nonce?: Digital
     ) {
-        this.version = dig2str(version || '0')
+        this.version = <number>toSafeInt(version || 0)
         this.sk = bin2hex(sk || '')
-        this.gasPrice = dig2str(gasPrice || '0')
-        this.gasLimit = dig2str(gasLimit || 0)
-        this.nonce = dig2str(nonce || 0)
+        this.gasPrice = toBigN(gasPrice || 0)
+        this.gasLimit = toBigN(gasLimit || 0)
+        this.nonce = toBigN(nonce || 0)
     }
 
 
     increaseNonce(): void {
-        let n = <BN>convert(this.nonce, ABI_DATA_TYPE.u64)
-        this.nonce = n.add(ONE).toString(10)
+        this.nonce = BigInt(this.nonce) + ONE
     }
 
     /**
@@ -112,7 +113,7 @@ export class TransactionBuilder {
             to
         )
 
-        if (this.nonce && parseFloat(this.nonce) > 0) {
+        if (this.nonce && this.nonce > 0) {
             ret.nonce = dig2str(this.nonce)
             this.increaseNonce()
             this.sign(ret)

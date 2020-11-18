@@ -1,25 +1,27 @@
 import { AbiInput, Binary, Digital } from './constants'
-import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeInt } from "./utils";
+import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeInt, toSafeDig } from "./utils";
 import { sm3, sm2 } from '@salaku/sm-crypto'
 import { constants, ABI_DATA_TYPE, Readable } from './constants'
 import rlp = require('./rlp')
-import BN = require('./bn')
 import { Encoder } from "./rlp";
 import { ABI, Contract } from './contract'
 
 // 2020-10-25T09:57:15+08:00
 const OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/.compile()
 
-
+/**
+ * 事务实体类，字段尽量用字符串表示，便于在 json 中序列化和反序列化
+ * 当部分字段可能丢失精度时会用字符串表示整数
+ */
 export class Transaction implements Encoder {
-    version: string
-    type: string
-    createdAt: string
-    nonce: string
+    version: number | string
+    type: number | string
+    createdAt: number | string
+    nonce: number | string
     from: string
-    gasLimit: string
-    gasPrice: string
-    amount: string
+    gasLimit: number | string
+    gasPrice: number | string
+    amount: number | string
     payload: string
     to: string
     signature: string
@@ -34,13 +36,13 @@ export class Transaction implements Encoder {
 
             }
         }
-        this.version = dig2str(version || 0)
-        this.type = dig2str(type || 0)
-        this.createdAt = dig2str(createdAt || 0)
+        this.version = toSafeDig(version || 0)
+        this.type = toSafeDig(type || 0)
+        this.createdAt = toSafeDig(createdAt || 0)
         this.nonce = dig2str(nonce || 0)
         this.from = bin2hex(from || '')
-        this.gasLimit = dig2str(gasLimit || 0)
-        this.gasPrice = dig2str(gasPrice || 0)
+        this.gasLimit = toSafeDig(gasLimit || 0)
+        this.gasPrice = toSafeDig(gasPrice || 0)
         this.amount = dig2str(amount || 0)
         this.payload = bin2hex(payload || '')
         this.to = bin2hex(to || '')
@@ -52,6 +54,10 @@ export class Transaction implements Encoder {
             this.__inputs = __inputs
     }
 
+    /**
+     * 从 JSON 对象中生成 Transaction 实例
+     * @param o 
+     */
     static clone(o?: any): Transaction {
         o = o || {}
         return new Transaction(o.version, o.type, o.createdAt, o.nonce, o.from, o.gasLimit, o.gasPrice, o.amount, o.payload, o.to, o.signature)
@@ -87,12 +93,12 @@ export class Transaction implements Encoder {
         return [
             convert(this.version || 0, ABI_DATA_TYPE.u64),
             convert(this.type || 0, ABI_DATA_TYPE.u64),
-            convert(this.createdAt || '0', ABI_DATA_TYPE.u64),
-            convert(this.nonce || '0', ABI_DATA_TYPE.u64),
+            convert(this.createdAt || 0, ABI_DATA_TYPE.u64),
+            convert(this.nonce || 0, ABI_DATA_TYPE.u64),
             convert(this.from || '', ABI_DATA_TYPE.bytes),
-            convert(this.gasLimit || '0', ABI_DATA_TYPE.u64),
-            convert(this.gasPrice || '0', ABI_DATA_TYPE.u256),
-            convert(this.amount || '0', ABI_DATA_TYPE.u256),
+            convert(this.gasLimit || 0, ABI_DATA_TYPE.u64),
+            convert(this.gasPrice || 0, ABI_DATA_TYPE.u256),
+            convert(this.amount || 0, ABI_DATA_TYPE.u256),
             convert(this.payload || '', ABI_DATA_TYPE.bytes),
             (this.to && this.to.length) ? convert(this.to, ABI_DATA_TYPE.address) : ''
         ]
@@ -103,7 +109,7 @@ export class Transaction implements Encoder {
         const cnv: (i: AbiInput) => Readable = (x: AbiInput) => {
             if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                 return bin2hex(x)
-            if (typeof x === 'bigint' || x instanceof BN || x instanceof BigInt)
+            if (typeof x === 'bigint')
                 return toSafeInt(x)
             return x
         }
@@ -124,16 +130,25 @@ export class Transaction implements Encoder {
         }
     }
 
+    /**
+     * 合约调用的方法
+     */
     getMethod() {
-        const t = parseInt(this.type)
+        const t = typeof this.type === 'string' ? parseInt(this.type) : this.type
         return t === constants.DEPLOY ? 'init' : bin2str(<Uint8Array>(rlp.decode(hex2bin(this.payload)))[0])
     }
 
+    /**
+     * 是否是合约部署或者合约调用事务
+     */
     isDeployOrCall() {
-        const t = parseInt(this.type)
+        const t = typeof this.type === 'string' ? parseInt(this.type) : this.type
         return t === constants.DEPLOY || t === constants.CONTRACT_CALL
     }
 
+    /**
+     * 是否是对内置合约的调用
+     */
     isBuiltInCall() {
         return this.isDeployOrCall() &&
             (this.to === constants.PEER_AUTHENTICATION_ADDR || this.to === constants.POA_AUTHENTICATION_ADDR

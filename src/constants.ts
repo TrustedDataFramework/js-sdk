@@ -1,21 +1,67 @@
-import BN = require("./bn")
+/**
+ * 十进制表示的整数
+ */
+export type Digital = string | number | bigint
 
-export type Digital = string | number | BN | BigInt
+/**
+ * 二进制流 或者 十六进制编码后的二进制流, Nodejs 中的 Buffer 是 Uint8Array 的实现
+ */
 export type Binary = string | Uint8Array | ArrayBuffer
-export type Readable = string | number | boolean
-export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | BN | BigInt
+
+/**
+ * 表示可以被阅读的字面量
+ */
+export type Readable = string | number | boolean | bigint
+
+/**
+ * 表示合法的合约调用参数类型
+ */
+export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | bigint
 export type RLPElement = Uint8Array | Uint8Array[]
 
+
+/**
+ * 事务的状态
+ */
 export enum TX_STATUS {
+    /**
+     * 进入了内存池
+     */
     PENDING,
+
+    /**
+     * 已经被打包进了区块
+     */
     INCLUDED,
+
+    /**
+     * 已经被确认
+     */
     CONFIRMED,
+
+    /**
+     * 被丢弃
+     */
     DROPPED
 }
 
+/**
+ * 常量
+ */
 export const constants = {
+    /**
+     * POA 共识版本号
+     */
     POA_VERSION: 1634693120,
+
+    /**
+     * POW 共识版本号
+     */
     POW_VERSION: 7368567,
+
+    /**
+     * POS 共识的版本号
+     */
     POS_VERSION: 7368563,
     COINBASE: 0,
     TRANSFER: 1,
@@ -40,13 +86,14 @@ export enum ABI_DATA_TYPE {
     u256
 }
 
-export const MAX_U64 = new BN('ffffffffffffffff', 16)
-export const MAX_U256 = new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16)
-export const MAX_I64 = new BN('9223372036854775807', 10)
-export const MIN_I64 = new BN('-9223372036854775808', 10)
+export const MAX_U64 = BigInt('0xffffffffffffffff')
+export const MAX_U256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+export const MAX_I64 = BigInt('9223372036854775807')
+export const MIN_I64 = BigInt('-9223372036854775808')
 
-export const MAX_SAFE_INTEGER = new BN(Number.MAX_SAFE_INTEGER)
-export const MIN_SAFE_INTEGER = new BN(Number.MIN_SAFE_INTEGER)
-export const ONE = new BN(1)
-export const ZERO = new BN(0)
+export const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
+export const MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER)
+
+export const ONE = BigInt(1)
+export const ZERO = BigInt(0)
 
