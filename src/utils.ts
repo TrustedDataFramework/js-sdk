@@ -3,7 +3,6 @@ import { ABI_DATA_TYPE, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, M
 import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
 import { Transaction } from "./tx"
 import { Server } from 'http'
-import BN = require("./bn");
 
 const UTF8Decoder =  new TextDecoder('utf-8')
 

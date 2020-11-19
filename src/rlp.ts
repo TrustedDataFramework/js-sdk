@@ -221,7 +221,10 @@ export function encode(o: string | any[] | number | null | Uint8Array | ArrayBuf
 }
 
 
-
+/**
+ * rlp 解码，解码的结果可能是数组、字节流
+ * @param e
+ */
 export function decode(e: Uint8Array | ArrayBuffer):
     RLPElement | RLPElement[] {
     const encoded = e instanceof ArrayBuffer ? new Uint8Array(e) : e

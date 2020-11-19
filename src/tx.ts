@@ -1,5 +1,5 @@
 import { AbiInput, Binary, Digital } from './constants'
-import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeInt, toSafeDig } from "./utils";
+import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeDig } from "./utils";
 import { sm3, sm2 } from '@salaku/sm-crypto'
 import { constants, ABI_DATA_TYPE, Readable } from './constants'
 import rlp = require('./rlp')

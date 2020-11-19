@@ -1,5 +1,5 @@
 /**
- * 十进制表示的整数
+ * 整数或者十进制、十六进制表示的整数字符串
  */
 export type Digital = string | number | bigint
 
@@ -17,8 +17,13 @@ export type Readable = string | number | boolean | bigint
  * 表示合法的合约调用参数类型
  */
 export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | bigint
+
 export type RLPElement = Uint8Array | Uint8Array[]
 
+/**
+ * AbiEncoded 后的结果, 用于调用合约 [输入类型[], 输入[], 输出类型[]]
+ */
+export type AbiEncoded = [ABI_DATA_TYPE[], Array<string | Uint8Array | bigint | number>, ABI_DATA_TYPE[]]
 
 /**
  * 事务的状态

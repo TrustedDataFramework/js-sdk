@@ -9,7 +9,7 @@ import {
     MAX_U64,
     ONE,
     Readable,
-    ZERO
+    AbiEncoded
 } from "./constants";
 import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
@@ -276,7 +276,7 @@ export class Contract {
      * @param name 方法名称
      * @param li 
      */
-    abiEncode(name: string, li?: AbiInput | AbiInput[] | Record<string, AbiInput>): [ABI_DATA_TYPE[], Array<string | Uint8Array | bigint | number>, ABI_DATA_TYPE[]] {
+    abiEncode(name: string, li?: AbiInput | AbiInput[] | Record<string, AbiInput>): AbiEncoded {
         const func = this.getABI(name, 'function')
 
         // 得到返回类型
@@ -419,7 +419,7 @@ export function compileABI(str: Binary): ABI[] {
     for (let m of (s.match(funRe) || [])) {
         funRe.lastIndex = 0
         const r = funRe.exec(m)
-        if (r[1] === '__idof')
+        if (r[1].startsWith('__'))
             continue
         ret.push(new ABI(
             r[1],
