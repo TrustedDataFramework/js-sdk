@@ -64,7 +64,7 @@ export class RLP {
         }
 
         if (isFloat<T>()) {
-            return reinterpret<f64>(RLP.decodeU64(buf));
+            return reinterpret<f64>(RLP.decodeU64(buf))
         }
 
         if (isBoolean<T>()) {

@@ -14,6 +14,7 @@ import {
 import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
 import { OutputStream } from 'assemblyscript/cli/asc'
+import * as path from "path";
 
 class MemoryOutputStream implements OutputStream {
     buf: Uint8Array
@@ -39,7 +40,8 @@ class MemoryOutputStream implements OutputStream {
 export async function compileContract(ascPath?: string, src?: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array> {
     if (typeof ascPath === 'string' && typeof src === 'string') {
         const child_process = require('child_process')
-        let cmd = ascPath + ' ' + src + ' -b ' // 执行的命令
+        // --runtime none 可以取消垃圾回收
+        let cmd = ascPath + ' ' + src + ` -b --runtime none --use abort=${path.relative(process.cwd(), path.join(__dirname, '../lib/prelude/abort'))}` // 执行的命令
         if (opts && opts.debug)
             cmd += ' --debug '
         if (opts && opts.optimize)
@@ -68,7 +70,11 @@ export async function compileContract(ascPath?: string, src?: string, opts?: { d
         throw new Error('invalid source file ' + src)
     const arr = [
         src,
-        "-b"
+        "-b",
+        '--runtime',
+        'none',
+        '--use',
+        `abort=${path.relative(process.cwd(), path.join(__dirname, '../lib/prelude/abort'))}`
     ]
     const stdout = new MemoryOutputStream()
     const stderr = new MemoryOutputStream()
