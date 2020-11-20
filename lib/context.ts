@@ -1,24 +1,5 @@
-import { RLPList, RLP } from "./rlp";
-import { Util, U256 } from "./util";
-
-
-/**
- * host function interface 
- * @param type 
- */
-export function ___idof(type: ABI_DATA_TYPE): u32 {
-    switch (type) {
-        case ABI_DATA_TYPE.STRING:
-            return idof<string>();
-        case ABI_DATA_TYPE.BYTES:
-            return idof<ArrayBuffer>();
-        case ABI_DATA_TYPE.ADDRESS:
-            return idof<Address>();
-        case ABI_DATA_TYPE.U256:
-            return idof<U256>();
-    }
-    return 0;
-}
+import { RLPList, RLP } from "./rlp"
+import { Util, U256 } from "./util"
 
 function __getAbiOf<T>(): ABI_DATA_TYPE {
     if (isBoolean<T>()) {
@@ -60,7 +41,7 @@ export enum ABI_DATA_TYPE {
 // @ts-ignore
 @external("env", "_context")
 // type, dst, put ?
-declare function _context(type: u64, arg0: u64, arg1: u64, arg2: u64, arg3: u64): u64;
+declare function _context(type: u64, arg0: u64): u64;
 
 // @ts-ignore
 @external("env", "_reflect")
@@ -71,7 +52,7 @@ declare function _reflect(type: u64, ptr0: u64, ptr0Len: u64, ptr1: u64, ptr1Len
 // @ts-ignore
 @external("env", "_transfer")
 // type, address, amount
-declare function _transfer(type: u64, ptr0: u64, ptr1Len: u64, amount_ptr: u64, amount_len: u64): void;
+declare function _transfer(type: u64, arg0: u64, arg1: u64): void;
 
 
 // @ts-ignore
@@ -83,15 +64,23 @@ declare function _event(
     arg3: u64
 ): void;
 
-function getBytes(type: u32): ArrayBuffer {
-    const len = u32(_context(type, 0, 0, 0, 0));
-    const buf = new ArrayBuffer(u32(len));
-    _context(type, changetype<usize>(buf), 1, 0, 0);
-    return buf;
+function _bytes(type: u32): ArrayBuffer {
+    let ptr = usize(_context(type, 0))
+    return changetype<ArrayBuffer>(ptr)
 }
 
-function getU64(type: u32): u64 {
-    return _context(type, 0, 0, 0, 0);
+function _u256(type: u32): U256 {
+    let ptr = usize(_context(type, 0))
+    return changetype<U256>(ptr)
+}
+
+function _address(type: u32): Address {
+    let ptr = usize(_context(type, 0))
+    return changetype<Address>(ptr)
+}
+
+function _u64(type: u32): u64 {
+    return _context(type, 0);
 }
 
 enum ReflectType {
@@ -162,33 +151,26 @@ export class Address {
     }
 
     balance(): U256 {
-        const len = _context(ContextType.ACCOUNT_BALANCE, changetype<usize>(this.buf), this.buf.byteLength, 0, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _context(ContextType.ACCOUNT_BALANCE, changetype<usize>(this.buf), this.buf.byteLength, changetype<usize>(ret), 1);
-        return new U256(ret);
+        let ptr = usize(_context(ContextType.ACCOUNT_BALANCE, changetype<usize>(this)))
+        return changetype<U256>(ptr)
     }
 
     nonce(): u64 {
-        const ptr = changetype<usize>(this.buf);
-        return _context(ContextType.ACCOUNT_NONCE, ptr, this.buf.byteLength, 0, 0);
+        const ptr = changetype<usize>(this);
+        return _context(ContextType.ACCOUNT_NONCE, ptr);
     }
 
     // get contract code
     code(): ArrayBuffer {
-        const ptr = changetype<usize>(this.buf);
-        const len = _context(ContextType.CONTRACT_CODE, ptr, this.buf.byteLength, 0, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _context(ContextType.CONTRACT_CODE, ptr, this.buf.byteLength, changetype<usize>(ret), 1);
-        return ret;
+        const ptr = changetype<usize>(this);
+        const ret = usize(_context(ContextType.CONTRACT_CODE, ptr))
+        return changetype<ArrayBuffer>(ret)
     }
 
     // get contract abi
     abi(): ArrayBuffer {
-        const ptr = changetype<usize>(this.buf);
-        const len = _context(ContextType.CONTRACT_ABI, ptr, this.buf.byteLength, 0, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _context(ContextType.CONTRACT_ABI, ptr, this.buf.byteLength, changetype<usize>(ret), 1);
-        return ret;
+        const ptr = _context(ContextType.CONTRACT_ABI, changetype<usize>(this));
+        return changetype<ArrayBuffer>(usize(ptr))
     }
 
     toString(): string {
@@ -316,7 +298,7 @@ export class Context {
      * get address of current contract
      */
     static self(): Address {
-        return new Address(getBytes(ContextType.CONTRACT_ADDRESS));
+        return _address(ContextType.CONTRACT_ADDRESS)
     }
 
     static emit<T>(t: T): void {
@@ -380,42 +362,41 @@ export class Context {
     }
 
 
-
     static header(): Header {
         return new Header(
-            getBytes(ContextType.HEADER_PARENT_HASH),
-            getU64(ContextType.HEADER_CREATED_AT),
-            getU64(ContextType.HEADER_HEIGHT)
+            _bytes(ContextType.HEADER_PARENT_HASH),
+            _u64(ContextType.HEADER_CREATED_AT),
+            _u64(ContextType.HEADER_HEIGHT)
         );
     }
 
     static msg(): Msg {
         return new Msg(
-            new Address(getBytes(ContextType.MSG_SENDER)),
-            new U256(getBytes(ContextType.MSG_AMOUNT))
-        );
+            _address(ContextType.MSG_SENDER),
+            _u256(ContextType.MSG_AMOUNT)
+        )
     }
 
     static transaction(): Transaction {
         return new Transaction(
-            u8(getU64(ContextType.TX_TYPE)),
-            getU64(ContextType.TX_CREATED_AT),
-            getU64(ContextType.TX_NONCE),
-            new Address(getBytes(ContextType.TX_ORIGIN)),
-            new U256(getBytes(ContextType.TX_GAS_PRICE)),
-            new U256(getBytes(ContextType.TX_AMOUNT)),
-            new Address(getBytes(ContextType.TX_TO)),
-            getBytes(ContextType.TX_SIGNATURE),
-            getBytes(ContextType.TX_HASH),
+            u8(_u64(ContextType.TX_TYPE)),
+            _u64(ContextType.TX_CREATED_AT),
+            _u64(ContextType.TX_NONCE),
+            _address(ContextType.TX_ORIGIN),
+            _u256(ContextType.TX_GAS_PRICE),
+            _u256(ContextType.TX_AMOUNT),
+            _address(ContextType.TX_TO),
+            _bytes(ContextType.TX_SIGNATURE),
+            _bytes(ContextType.TX_HASH),
         );
     }
 
     static contract(): Contract {
         return new Contract(
-            new Address(getBytes(ContextType.CONTRACT_ADDRESS)),
-            getU64(ContextType.CONTRACT_NONCE),
-            new Address(getBytes(ContextType.CONTRACT_CREATED_BY))
-        );
+            _address(ContextType.CONTRACT_ADDRESS),
+            _u64(ContextType.CONTRACT_NONCE),
+            _address(ContextType.CONTRACT_CREATED_BY)
+        )
     }
 
     static create(code: ArrayBuffer, abi: ArrayBuffer, parameters: Parameters, amount: U256): Address {

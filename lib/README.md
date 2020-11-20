@@ -1,6 +1,6 @@
 # 智能合约开发
 
-## WebAssembly 特性
+## WebAssembly
 
 在 WebAssembly 中访问宿主机数据需要建立接口， 本文列举了目前需要的接口。 考虑到未来可能会使用到其他 WebAssembly 的前端语言，
 而且 AssemblyScript 的版本也在快速迭代中，接口的设计必须具有一定的兼容多语言的能力，而且易于实现

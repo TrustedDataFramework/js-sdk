@@ -1,23 +1,12 @@
-import { U256, Address} from '.'
-import { Util } from './util';
-const OFFSET_SHORT_LIST: u8 = 0xc0;
+import { U256, Address } from '.'
+import { Util } from './util'
+import {log} from "./prelude";
 
-// @ts-ignore
-@external("env", "_rlp")
-// type, ptr0 ptr0Len dst, put ? 
-declare function _rlp(type: u64, arg0: u64, arg1: u64, arg2: u64, arg3: u64): u64;
-
-enum Type {
-    ENCODE_U64,
-    ENCODE_BYTES,
-    DECODE_BYTES,
-    RLP_LIST_SET, // add rlp list to global env
-    RLP_LIST_CLEAR, // clear rlp list
-    RLP_LIST_LEN,
-    RLP_LIST_GET,
-    RLP_LIST_PUSH,
-    RLP_LIST_BUILD // build 
-}
+const OFFSET_SHORT_LIST = 0xc0
+const OFFSET_SHORT_ITEM = 0x80
+const SIZE_THRESHOLD = 56
+const OFFSET_LONG_ITEM = 0xb7
+const OFFSET_LONG_LIST = 0xf7
 
 export class RLP {
     static emptyList(): ArrayBuffer {
@@ -38,6 +27,7 @@ export class RLP {
         }
 
         if (isInteger<T>()) {
+            log('is integer ')
             return RLP.encodeU64(u64(t));
         }
 
@@ -112,10 +102,7 @@ export class RLP {
     }
 
     static encodeU64(u: u64): ArrayBuffer {
-        const len = _rlp(Type.ENCODE_U64, u, 0, 0, 0);
-        const buf = new ArrayBuffer(u32(len));
-        _rlp(Type.ENCODE_U64, u, 0, changetype<usize>(buf), 1);
-        return buf;
+        return encodeBytes(Util.u64ToBytes(u))
     }
 
     static encodeU256(u: U256): ArrayBuffer {
@@ -159,10 +146,14 @@ export class RLP {
     }
 
     static decodeBytes(data: ArrayBuffer): ArrayBuffer {
-        const len = _rlp(Type.DECODE_BYTES, changetype<usize>(data), data.byteLength, 0, 0);
-        const buf = new ArrayBuffer(u32(len));
-        _rlp(Type.DECODE_BYTES, changetype<usize>(data), data.byteLength, changetype<usize>(buf), 1);
-        return buf;
+        const v = Uint8Array.wrap(data)
+        const parser = new RLPParser(data)
+        if (v.length === 1 && v[0] === 0x80)
+            return new ArrayBuffer(0)
+        if (parser.remained() > 1) {
+            parser.skip(parser.prefixLength())
+        }
+        return parser.bytes(parser.remained())
     }
 }
 
@@ -216,6 +207,104 @@ export class RLPItem {
     }
 }
 
+function copyOfRange(arr: Uint8Array, offset: number, limit: number): ArrayBuffer {
+    let ret = new Uint8Array(limit - offset)
+    ret.set(arr.slice(offset, limit))
+    return ret.buffer
+}
+
+class RLPParser {
+    buf: Uint8Array
+    offset: i32
+    limit: i32
+
+    constructor(buf: ArrayBuffer, offset: i32 = 0, limit: i32 = buf.byteLength) {
+        this.buf = Uint8Array.wrap(buf)
+        this.offset = offset
+        this.limit = limit
+    }
+
+    prefixLength(): i32 {
+        const prefix = i32(this.buf[this.offset])
+        if (prefix <= OFFSET_LONG_ITEM) {
+            return 1
+        }
+        if (prefix < OFFSET_SHORT_LIST) {
+            return 1 + (prefix - OFFSET_LONG_ITEM);
+        }
+        if (prefix <= OFFSET_LONG_LIST) {
+            return 1
+        }
+        return 1 + (prefix - OFFSET_LONG_LIST)
+    }
+
+    skip(n: i32): void{
+        this.offset += n
+    }
+
+    peekSize(): i32 {
+        const prefix = i32(this.buf[this.offset])
+        if (prefix < OFFSET_SHORT_ITEM) {
+            return 1
+        }
+        if (prefix <= OFFSET_LONG_ITEM) {
+            return prefix - OFFSET_SHORT_ITEM + 1
+        }
+        if (prefix < OFFSET_SHORT_LIST) {
+            return i32(Util.bytesToU64(
+                copyOfRange(this.buf, 1 + this.offset, 1 + this.offset + prefix - OFFSET_LONG_ITEM)
+            ) + 1 + prefix - OFFSET_LONG_ITEM)
+        }
+        if (prefix <= OFFSET_LONG_LIST) {
+            return prefix - OFFSET_SHORT_LIST + 1
+        }
+        return i32(Util.bytesToU64(
+            copyOfRange(this.buf, 1 + this.offset, this.offset + 1 + prefix - OFFSET_LONG_LIST)
+            ))
+            + 1 + prefix - OFFSET_LONG_LIST
+    }
+
+    bytes(n: i32): ArrayBuffer {
+        assert(this.offset + n <= this.limit, 'read overflow')
+        const ret = new Uint8Array(n)
+        ret.set(this.buf.slice(this.offset, this.offset + n))
+        return ret.buffer
+    }
+
+    remained(): i32 {
+        return this.limit - this.offset;
+    }
+}
+
+function estimateSize(encoded: ArrayBuffer): i32 {
+    const parser = new RLPParser(encoded)
+    return parser.peekSize()
+}
+
+function validateSize(encoded: ArrayBuffer): void{
+    assert(encoded.byteLength === estimateSize(encoded), 'invalid rlp format')
+}
+
+function isRLPList(encoded: ArrayBuffer): boolean{
+    return Uint8Array.wrap(encoded)[0] >= OFFSET_SHORT_LIST
+}
+
+function decodeElements(enc: ArrayBuffer): ArrayBuffer[] {
+    validateSize(enc);
+    if (!isRLPList(enc)) {
+        throw new Error('not a rlp list')
+    }
+    const parser = new RLPParser(enc)
+    parser.skip(parser.prefixLength())
+    const ret = []
+    while (parser.remained() > 0) {
+        ret.push(parser.bytes(parser.peekSize()))
+    }
+    return ret;
+}
+
+
+
 export class RLPList {
     static EMPTY: RLPList = new RLPList([], RLP.emptyList());
 
@@ -223,16 +312,7 @@ export class RLPList {
     }
 
     static fromEncoded(encoded: ArrayBuffer): RLPList {
-        _rlp(Type.RLP_LIST_SET, changetype<usize>(encoded), encoded.byteLength, 0, 0);
-        const len = u32(_rlp(Type.RLP_LIST_LEN, 0, 0, 0, 0));
-        const elements = new Array<ArrayBuffer>(len);
-        for (let i: u32 = 0; i < len; i++) {
-            const bufLen = _rlp(Type.RLP_LIST_GET, i, 0, 0, 0);
-            const buf = new ArrayBuffer(u32(bufLen));
-            _rlp(Type.RLP_LIST_GET, i, 0, changetype<usize>(buf), 1);
-            elements[i] = buf;
-        }
-        _rlp(Type.RLP_LIST_CLEAR, 0, 0, 0, 0);
+        const elements = decodeElements(encoded)
         return new RLPList(elements, encoded);
     }
 
@@ -257,24 +337,65 @@ export class RLPList {
     }
 }
 
+function encodeBytes(b: ArrayBuffer): ArrayBuffer {
+    let v = Uint8Array.wrap(b)
+    if (b.byteLength === 0) {
+        const ret = new Uint8Array(1);
+        ret[0] = OFFSET_SHORT_ITEM
+        return ret.buffer
+    }
+    if (v.length === 1 && i32(v[0] & 0xFF) < OFFSET_SHORT_ITEM) {
+        return b
+    }
+    if (v.length < SIZE_THRESHOLD) {
+        // length = 8X
+        const prefix = OFFSET_SHORT_ITEM + v.length
+        const ret = new Uint8Array(v.length + 1)
+        ret.set(v, 1)
+        ret[0] = prefix
+        return ret.buffer
+    }
 
-function encodeBytes(bytes: ArrayBuffer): ArrayBuffer {
-    const len = _rlp(Type.ENCODE_BYTES, changetype<usize>(bytes), bytes.byteLength, 0, 0);
-    const buf = new ArrayBuffer(u32(len));
-    _rlp(Type.ENCODE_BYTES, changetype<usize>(bytes), bytes.byteLength, changetype<usize>(buf), 1);
-    return buf;
+    let lenEncodded = Util.u64ToBytes(u64(v.length))
+
+    const ret = new Uint8Array(1 + lenEncodded.byteLength + v.length)
+    ret[0] = OFFSET_LONG_ITEM + lenEncodded.byteLength
+    ret.set(Uint8Array.wrap(lenEncodded), 1)
+    ret.set(v, 1 + lenEncodded.byteLength)
+    return ret.buffer
 }
 
 
-function encodeElements(elements: Array<ArrayBuffer>): ArrayBuffer {
-    if (elements.length == 0)
-        return RLP.emptyList();
+export function encodeElements(elements: ArrayBuffer[]): ArrayBuffer {
+    let totalLength = 0
+
     for (let i = 0; i < elements.length; i++) {
-        const buf = elements[i];
-        _rlp(Type.RLP_LIST_PUSH, changetype<usize>(buf), buf.byteLength, 0, 0);
+        const el = elements[i];
+        totalLength += el.byteLength
     }
-    const len = _rlp(Type.RLP_LIST_BUILD, 0, 0, 0, 0);
-    const buf = new ArrayBuffer(u32(len));
-    _rlp(Type.RLP_LIST_BUILD, 0, 0, changetype<usize>(buf), 1);
-    return buf;
+
+    let data: Uint8Array
+    let copyPos = 0
+
+    if (totalLength < SIZE_THRESHOLD) {
+        data = new Uint8Array(1 + totalLength);
+        data[0] = OFFSET_SHORT_LIST + totalLength;
+        copyPos = 1;
+    } else {
+        // length of length = BX
+        // prefix = [BX, [length]]
+        let totalLengthEncoded = Util.u64ToBytes(u64(totalLength))
+
+        // first byte = F7 + bytes.length
+        data = new Uint8Array(1 + totalLengthEncoded.byteLength + totalLength)
+        data[0] = OFFSET_LONG_LIST + totalLengthEncoded.byteLength
+        data.set(Uint8Array.wrap(totalLengthEncoded), 1)
+        copyPos = totalLengthEncoded.byteLength + 1
+    }
+    for (let i = 0; i < elements.length; i++) {
+        const el = Uint8Array.wrap(elements[i])
+        data.set(el, copyPos)
+        copyPos += el.length
+    }
+    return data.buffer
 }

@@ -1,25 +1,10 @@
-// @ts-ignore
-@external("env", "_util")
-// type, address, method, parameters, dst, put?
-declare function _util(type: u64, ptr0: u64, ptr0Len: u64, ptr1: u64, ptr1Len: u64, dst: u64, put: u64): u64;
+import {log} from "./prelude";
 
-// @ts-ignore
 @external("env", "_u256")
 // type, a, b, dst, put ? : length
-declare function _u256(type: u64, ptr0: u64, ptr0Len: u64, ptr1: u64, ptr1Len: u64, dst: u64, put: u64): u64;
-
-
-enum UtilType {
-    CONCAT_BYTES,
-    DECODE_HEX,
-    ENCODE_HEX,
-    BYTES_TO_U64,
-    U64_TO_BYTES
-}
+declare function _u256(t: u64, left: u64, right: u64): u64;
 
 enum U256Type {
-    PARSE,
-    TOSTRING,
     ADD,
     SUB,
     MUL,
@@ -29,62 +14,62 @@ enum U256Type {
 
 export class U256 {
     @operator("+")
-    static __op_add(left: U256, right :U256): U256 {
+    static __op_add(left: U256, right: U256): U256 {
         return left.safeAdd(right);
     }
 
     @operator("-")
-    static __op_sub(left: U256, right :U256): U256 {
+    static __op_sub(left: U256, right: U256): U256 {
         return left.safeSub(right);
     }
 
     @operator("*")
-    static __op_mul(left: U256, right :U256): U256 {
+    static __op_mul(left: U256, right: U256): U256 {
         return left.safeMul(right);
     }
 
     @operator("/")
-    static __op_div(left: U256, right :U256): U256 {
+    static __op_div(left: U256, right: U256): U256 {
         return left.safeDiv(right);
     }
 
     @operator("%")
-    static __op_mod(left: U256, right :U256): U256 {
+    static __op_mod(left: U256, right: U256): U256 {
         return left.safeMod(right);
     }
 
     @operator(">")
-    static __op_gt(left: U256, right :U256): bool {
+    static __op_gt(left: U256, right: U256): bool {
         return left.compareTo(right) > 0;
     }
 
     @operator(">=")
-    static __op_gte(left: U256, right :U256): bool {
+    static __op_gte(left: U256, right: U256): bool {
         return left.compareTo(right) >= 0;
     }
 
     @operator("<")
-    static __op_lt(left: U256, right :U256): bool {
+    static __op_lt(left: U256, right: U256): bool {
         return left.compareTo(right) < 0;
     }
 
     @operator("<=")
-    static __op_lte(left: U256, right :U256): bool {
+    static __op_lte(left: U256, right: U256): bool {
         return left.compareTo(right) <= 0;
     }
 
     @operator("==")
-    static __op_eq(left: U256, right :U256): bool {
+    static __op_eq(left: U256, right: U256): bool {
         return left.compareTo(right) == 0;
     }
 
     @operator("!=")
-    static __op_ne(left: U256, right :U256): bool {
+    static __op_ne(left: U256, right: U256): bool {
         return left.compareTo(right) != 0;
     }
 
-    static ZERO: U256 = new U256(new ArrayBuffer(0));
-    static ONE: U256 = U256.fromU64(1);
+    static ZERO: U256 = new U256(new ArrayBuffer(0))
+    static ONE: U256 = U256.fromU64(1)
 
     static fromU64(u: u64): U256 {
         const buf = Util.u64ToBytes(u);
@@ -96,10 +81,8 @@ export class U256 {
     }
 
     private arithmetic(t: U256Type, u: U256): U256 {
-        const len = _u256(t, changetype<usize>(this.buf), this.buf.byteLength, changetype<usize>(u.buf), u.buf.byteLength, 0, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _u256(t, changetype<usize>(this.buf), this.buf.byteLength, changetype<usize>(u.buf), u.buf.byteLength, changetype<usize>(ret), 1);
-        return new U256(ret);
+        let r = _u256(t, changetype<usize>(this), changetype<usize>(u))
+        return changetype<U256>(usize(r))
     }
 
     add(u: U256): U256 {
@@ -157,44 +140,59 @@ export class U256 {
         return Util.compareBytes(this.buf, u.buf);
     }
 
-    toString(radix: u32 = 10): string {
-        const len = _u256(U256Type.TOSTRING, changetype<usize>(this.buf), this.buf.byteLength, radix, 0, 0, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _u256(U256Type.TOSTRING, changetype<usize>(this.buf), this.buf.byteLength, radix, 0, changetype<usize>(ret), 1);
-        return String.UTF8.decode(ret);
+    toString(): string {
+        let bf = new ArrayBuffer(32)
+        let v = Uint8Array.wrap(bf)
+        v.set(Uint8Array.wrap(this.buf), 32 - this.buf.byteLength)
+        return Util.encodeHex(bf)
     }
 
-    static parse(str: string, radix: u8 = 10): U256 {
-        const strbuf = String.UTF8.encode(str);
-        const len = _u256(U256Type.PARSE, changetype<usize>(strbuf), strbuf.byteLength, radix, 0, 0, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _u256(U256Type.PARSE, changetype<usize>(strbuf), strbuf.byteLength, radix, 0, changetype<usize>(ret), 1);
-        return new U256(ret);
+    static fromHex(str: string): U256 {
+        let bf = Util.decodeHex(str)
+        assert(bf.byteLength <= 32, 'u256 overflow')
+        let v = Uint8Array.wrap(bf)
+        let i = 0
+        while(v[i] == 0){
+            i++
+        }
+        return new U256(bf.slice(i, bf.byteLength))
     }
 }
 
 export class Util {
     static concatBytes(a: ArrayBuffer, b: ArrayBuffer): ArrayBuffer {
-        const len = _util(UtilType.CONCAT_BYTES, changetype<usize>(a), a.byteLength, changetype<usize>(b), b.byteLength, 0, 0);
-        const buf = new ArrayBuffer(u32(len));
-        _util(UtilType.CONCAT_BYTES, changetype<usize>(a), a.byteLength, changetype<usize>(b), b.byteLength, changetype<usize>(buf), 1);
-        return buf;
+        let concated = new ArrayBuffer(a.byteLength + b.byteLength)
+        let v = Uint8Array.wrap(concated)
+        v.set(Uint8Array.wrap(a), 0);
+        v.set(Uint8Array.wrap(b), a.byteLength);
+        return concated;
     }
 
-    // decode 
+    // decode hex
     static decodeHex(hex: string): ArrayBuffer {
-        const str = this.str2bin(hex);
-        const len = _util(UtilType.DECODE_HEX, changetype<usize>(str), str.byteLength, 0, 0, 0, 0);
-        const buf = new ArrayBuffer(u32(len));
-        _util(UtilType.DECODE_HEX, changetype<usize>(str), str.byteLength, 0, 0, changetype<usize>(buf), 1);
-        return buf;
+        let ret = new ArrayBuffer(hex.length / 2)
+        let v = Uint8Array.wrap(ret)
+        for (let i = 0; i < hex.length / 2; i++) {
+            v[i] = U8.parseInt(hex.substr(i * 2, 2), 16)
+        }
+        return ret
     }
 
     static encodeHex(data: ArrayBuffer): string {
-        const len = _util(UtilType.ENCODE_HEX, changetype<usize>(data), data.byteLength, 0, 0, 0, 0);
-        const buf = new ArrayBuffer(u32(len));
-        _util(UtilType.ENCODE_HEX, changetype<usize>(data), data.byteLength, 0, 0, changetype<usize>(buf), 1);
-        return String.UTF8.decode(buf);
+        let out = ""
+        let v = Uint8Array.wrap(data)
+        for (let i = 0; i < data.byteLength; i++) {
+            const a = v[i] as u32
+            const b = a & 0xf
+            const c = a >> 4
+
+            let x: u32 = ((87 + b + (((b - 10) >> 8) & ~38)) << 8) | (87 + c + (((c - 10) >> 8) & ~38));
+            out += String.fromCharCode(x as u8);
+            x >>= 8;
+            out += String.fromCharCode(x as u8);
+        }
+
+        return out
     }
 
     static compareBytes(a: ArrayBuffer, b: ArrayBuffer): i32 {
@@ -218,15 +216,28 @@ export class Util {
         return String.UTF8.encode(str);
     }
 
-    // convert u64 to bytes without leading zeros
+    // convert u64 to bytes without leading zeros, bigendian
     static u64ToBytes(u: u64): ArrayBuffer {
-        const len = _util(UtilType.U64_TO_BYTES, u, 0, 0, 0, 0, 0);
-        const buf = new ArrayBuffer(u32(len));
-        _util(UtilType.U64_TO_BYTES, u, 0, 0, 0, changetype<usize>(buf), 1);
-        return buf;
+        let ret = new ArrayBuffer(8)
+        let v = Uint8Array.wrap(ret)
+        let i = 0
+        while (u > 0) {
+            v[7 - i] = u8(u & 0xff)
+            u = u >>> 8
+            i++
+        }
+        return ret.slice(8 - i, 8)
     }
 
     static bytesToU64(bytes: ArrayBuffer): u64 {
-        return _util(UtilType.BYTES_TO_U64, changetype<usize>(bytes), bytes.byteLength, 0, 0, 0, 0);
+        let v = Uint8Array.wrap(bytes)
+        let u = 0
+        // 低位在后面
+        let j = 0
+        for(let i = v.length - 1; i >= 0; i--){
+            u |= v[i] << (u8(j) * 8)
+            j ++
+        }
+        return u
     }
 }
