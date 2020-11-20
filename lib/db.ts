@@ -1,18 +1,13 @@
-
-import { Util, RLP } from '.'
+import { Util } from './util'
+import { RLP } from './rlp'
 
 enum Type {
-    SET, GET, REMOVE, HAS, NEXT, CURRENT_KEY, CURRENT_VALUE, HAS_NEXT, RESET
+    SET, GET, REMOVE, HAS
 }
 
 // @ts-ignore
 @external("env", "_db")
-declare function _db(type: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64): u64;
-
-export class Entry {
-    constructor(readonly key: ArrayBuffer, readonly value: ArrayBuffer) {
-    }
-}
+declare function _db(type: u64, arg1: u64, arg2: u64): u64;
 
 export class Store<K, V>{
     static from<U, R>(str: string): Store<U, R>{
@@ -69,50 +64,25 @@ export class DB {
     static set(key: ArrayBuffer, value: ArrayBuffer): void {
         _db(
             Type.SET,
-            changetype<usize>(key), key.byteLength,
-            changetype<usize>(value), value.byteLength,
-        );
+            changetype<usize>(key),
+            changetype<usize>(value),
+        )
     }
 
     static remove(key: ArrayBuffer): void {
         _db(
             Type.REMOVE,
-            changetype<usize>(key), key.byteLength,
-            0, 0,
-        );
+            changetype<usize>(key), 0
+        )
     }
 
 
     static has(key: ArrayBuffer): bool {
-        return _db(Type.HAS, changetype<usize>(key), key.byteLength, 0, 0) != 0;
+        return _db(Type.HAS, changetype<usize>(key), 0) > 0
     }
 
     static get(key: ArrayBuffer): ArrayBuffer {
-        const len = _db(Type.GET, changetype<usize>(key), key.byteLength, 0, 0);
-        const buf = new ArrayBuffer(i32(len));
-        _db(Type.GET, changetype<usize>(key), key.byteLength, changetype<usize>(buf), 1);
-        return buf;
-    }
-
-
-}
-
-export class DBIterator {
-    static next(): Entry {
-        _db(Type.NEXT, 0, 0, 0, 0);
-        const keyBuf = new ArrayBuffer(i32(_db(Type.CURRENT_KEY, 0, 0, 0, 0)));
-        _db(Type.CURRENT_KEY, changetype<usize>(keyBuf), 1, 0, 0);
-
-        const valueBuf = new ArrayBuffer(_db(Type.CURRENT_VALUE, 0, 0, 0, 0));
-        _db(Type.CURRENT_KEY, changetype<usize>(valueBuf), 1, 0, 0);
-        return new Entry(keyBuf, valueBuf);
-    }
-
-    static hasNext(): bool {
-        return _db(Type.HAS_NEXT, 0, 0, 0, 0) != 0;
-    }
-
-    static reset(): void {
-        _db(Type.RESET, 0, 0, 0, 0);
+        let r = _db(Type.GET, changetype<usize>(key), 0)
+        return changetype<ArrayBuffer>(r)
     }
 }

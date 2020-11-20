@@ -1,6 +1,5 @@
-import { U256, Address } from '.'
-import { Util } from './util'
-import {log} from "./prelude";
+import { Address } from './context'
+import { Util, U256} from './util'
 
 const OFFSET_SHORT_LIST = 0xc0
 const OFFSET_SHORT_ITEM = 0x80
@@ -27,7 +26,6 @@ export class RLP {
         }
 
         if (isInteger<T>()) {
-            log('is integer ')
             return RLP.encodeU64(u64(t));
         }
 
@@ -54,10 +52,12 @@ export class RLP {
         }
 
         if (isFloat<T>()) {
+            // @ts-ignore
             return reinterpret<f64>(RLP.decodeU64(buf))
         }
 
         if (isBoolean<T>()) {
+            // @ts-ignore
             return RLP.decodeU64(buf) != 0;
         }
 
@@ -65,33 +65,37 @@ export class RLP {
             const ret = RLP.decodeU64(buf);
 
             if (sizeof<T>() == 8) {
+                // @ts-ignore
                 return ret;
             }
             if (sizeof<T>() == 4) {
-                assert(ret <= u32.MAX_VALUE, 'invalid u32: overflow');
-                return u32(ret);
+                assert(ret <= u32.MAX_VALUE, 'invalid u32: overflow')
+                // @ts-ignore
+                return u32(ret)
             }
             if (sizeof<T>() == 2) {
-                assert(ret <= u16.MAX_VALUE, 'invalid u32: overflow');
-                return u16(ret);
+                assert(ret <= u16.MAX_VALUE, 'invalid u32: overflow')
+                // @ts-ignore
+                return u16(ret)
             }
             if (sizeof<T>() == 1) {
-                assert(ret <= u8.MAX_VALUE, 'invalid u32: overflow');
+                assert(ret <= u8.MAX_VALUE, 'invalid u32: overflow')
+                // @ts-ignore
                 return u8(ret);
             }
         }
         if (isString<T>()) {
-            return changetype<T>(RLP.decodeString(buf));
+            return changetype<T>(RLP.decodeString(buf))
         }
         switch (idof<T>()) {
             case idof<ArrayBuffer>():
-                return changetype<T>(RLP.decodeBytes(buf));
+                return changetype<T>(RLP.decodeBytes(buf))
             case idof<U256>():
-                return changetype<T>(new U256(RLP.decodeBytes(buf)));
+                return changetype<T>(new U256(RLP.decodeBytes(buf)))
             case idof<Address>():
-                return changetype<T>(new Address(RLP.decodeBytes(buf)));
+                return changetype<T>(new Address(RLP.decodeBytes(buf)))
         }
-        assert(false, 'rlp encode failed, invalid type ' + nameof<T>());
+        assert(false, 'rlp encode failed, invalid type ' + nameof<T>())
         return changetype<T>(null);
     }
 
@@ -356,12 +360,12 @@ function encodeBytes(b: ArrayBuffer): ArrayBuffer {
         return ret.buffer
     }
 
-    let lenEncodded = Util.u64ToBytes(u64(v.length))
+    let lenEncoded = Util.u64ToBytes(u64(v.length))
 
-    const ret = new Uint8Array(1 + lenEncodded.byteLength + v.length)
-    ret[0] = OFFSET_LONG_ITEM + lenEncodded.byteLength
-    ret.set(Uint8Array.wrap(lenEncodded), 1)
-    ret.set(v, 1 + lenEncodded.byteLength)
+    const ret = new Uint8Array(1 + lenEncoded.byteLength + v.length)
+    ret[0] = OFFSET_LONG_ITEM + lenEncoded.byteLength
+    ret.set(Uint8Array.wrap(lenEncoded), 1)
+    ret.set(v, 1 + lenEncoded.byteLength)
     return ret.buffer
 }
 

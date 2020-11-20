@@ -1,4 +1,4 @@
-import { RLPList, RLP } from "./rlp"
+import { RLP } from "./rlp"
 import { Util, U256 } from "./util"
 
 function __getAbiOf<T>(): ABI_DATA_TYPE {
@@ -47,7 +47,7 @@ declare function _context(type: u64, arg0: u64): u64;
 @external("env", "_reflect")
 // type, address, method, parameters, dst
 // type, binary, parameters, 0, 0, amount , dst
-declare function _reflect(type: u64, ptr0: u64, ptr0Len: u64, ptr1: u64, ptr1Len: u64, ptr2: u64, ptr2Len: u64, amount_ptr: u64, amount_len: u64, dst: u64): u64;
+declare function _reflect(type: u64, addrOrBin: u64, method: u64, params: u64, amount: u64, abi: u64): u64;
 
 // @ts-ignore
 @external("env", "_transfer")
@@ -60,8 +60,7 @@ declare function _transfer(type: u64, arg0: u64, arg1: u64): void;
 //result z
 declare function _event(
     arg0: u64,
-    arg1: u64, arg2: u64,
-    arg3: u64
+    arg1: u64
 ): void;
 
 function _bytes(type: u32): ArrayBuffer {
@@ -84,8 +83,7 @@ function _u64(type: u32): u64 {
 }
 
 enum ReflectType {
-    CALL_WITHOUT_PUT, // call without put into memory
-    CALL_WITH_PUT, // call and put into memory
+    CALL, // call without put into memory
     CREATE
 }
 
@@ -126,27 +124,25 @@ export class Address {
     }
 
     transfer(amount: U256): void {
-        const ptr = changetype<usize>(this.buf);
-        _transfer(0, ptr, this.buf.byteLength, changetype<usize>(amount.buf), amount.buf.byteLength);
+        const ptr = changetype<usize>(this)
+        _transfer(0, ptr, changetype<usize>(amount))
     }
 
     call<T>(method: string, parameters: Parameters, amount: U256): T {
         let abiType: ArrayBuffer = isVoid<T>() ? RLP.emptyList() : RLP.encodeU64(__getAbiOf<T>());
         abiType = isVoid<T>() ? abiType : RLP.encodeElements([abiType]);
-        const arr: Array<ArrayBuffer> = [RLP.encodeElements(parameters.types), RLP.encodeElements(parameters.li), abiType];
-        const buf = RLP.encodeElements(arr);
-        const ptr0 = changetype<usize>(this.buf);
-        const ptr0len = this.buf.byteLength;
-        const str = String.UTF8.encode(method);
-        const ptr1 = changetype<usize>(str);
-        const ptr1len = str.byteLength;
-        const ptr2 = changetype<usize>(buf);
-        const ptr2len = buf.byteLength;
-        const len = _reflect(ReflectType.CALL_WITHOUT_PUT, ptr0, ptr0len, ptr1, ptr1len, ptr2, ptr2len, changetype<usize>(amount.buf), amount.buf.byteLength, 0);
-        const ret = new ArrayBuffer(u32(len));
-        _reflect(ReflectType.CALL_WITH_PUT, ptr0, ptr0len, ptr1, ptr1len, ptr2, ptr2len, changetype<usize>(amount.buf), amount.buf.byteLength, changetype<usize>(ret));
+        // [输入类型] [输入] [输出类型]
+        const arr: Array<ArrayBuffer> = [RLP.encodeElements(parameters.types), RLP.encodeElements(parameters.li), abiType]
+        const encodedParams = RLP.encodeElements(arr)
+
+        const r = _reflect(
+            ReflectType.CALL, changetype<usize>(this), changetype<usize>(method),
+            changetype<usize>(encodedParams), changetype<usize>(amount),
+            0
+        )
+
         if (!isVoid<T>()) {
-            return RLP.decode<T>(RLPList.fromEncoded(ret).getRaw(0));
+            return changetype<T>(r)
         }
     }
 
@@ -293,6 +289,7 @@ export class Contract {
     }
 }
 
+
 export class Context {
     /**
      * get address of current contract
@@ -301,64 +298,8 @@ export class Context {
         return _address(ContextType.CONTRACT_ADDRESS)
     }
 
-    static emit<T>(t: T): void {
-
-        const name = nameof<T>();
-        const nameBuf = Util.str2bin(name);
-        if (isManaged<T>())
-            assert(false, 'class ' + name + ' should be annotated with @unmanaged')
-        const abi = RLPList.fromEncoded(Context.self().abi());
-        for (let i: u32 = 0; i < abi.length(); i++) {
-            const li = abi.getList(i);
-            if (li.getItem(0).string() == name && li.getItem(1).u64() == 1) {
-                const outputs = li.getList(3);
-                const data = new Array<ArrayBuffer>();
-                let offset = 0;
-                let ptr = changetype<usize>(t)
-                for (let j: u32 = 0; j < outputs.length(); j++) {
-                    switch (outputs.getItem(j).u32()) {
-                        case ABI_DATA_TYPE.BOOL:{
-                            data.push(RLP.encodeU64(load<u8>(ptr + offset)));
-                            offset += 8;
-                            break;
-                        }
-                        case ABI_DATA_TYPE.F64:
-                        case ABI_DATA_TYPE.I64:
-                        case ABI_DATA_TYPE.U64:{
-                            data.push(RLP.encodeU64(load<u64>(ptr + offset)));
-                            offset += 8;
-                            break;
-                        }
-                        case ABI_DATA_TYPE.BYTES: {
-                            data.push(RLP.encodeBytes(load<ArrayBuffer>(ptr + offset)));
-                            offset += 4;
-                            break;
-                        }
-                        case ABI_DATA_TYPE.STRING: {
-                            data.push(RLP.encodeString(load<string>(ptr + offset)));
-                            offset += 4;
-                            break;
-                        }
-                        case ABI_DATA_TYPE.U256: {
-                            data.push(RLP.encodeU256(load<U256>(ptr + offset)));
-                            offset += 4;
-                            break;
-                        }
-                        case ABI_DATA_TYPE.ADDRESS: {
-                            data.push(RLP.encode<Address>(load<Address>(ptr + offset)));
-                            offset += 4;
-                            break;
-                        }
-                        default:
-                            assert(false, ' invalid abi type ' + outputs.getItem(j).u32().toString());
-                    }
-                }
-                const buf = RLP.encodeElements(data);
-                _event(changetype<usize>(nameBuf), nameBuf.byteLength, changetype<usize>(buf), buf.byteLength);
-                return
-            }
-        }
-        assert(false, 'emit event ' + name + ' failed, abi not found');
+    static emit<T>(name: string, encoded: ArrayBuffer): void {
+        _event(changetype<usize>(name), changetype<usize>(encoded))
     }
 
 
@@ -400,15 +341,13 @@ export class Context {
     }
 
     static create(code: ArrayBuffer, abi: ArrayBuffer, parameters: Parameters, amount: U256): Address {
-        const ptr0 = changetype<usize>(code);
-        const ptr0len = code.byteLength;
         const arr: Array<ArrayBuffer> = [RLP.encodeElements(parameters.types), RLP.encodeElements(parameters.li), RLP.emptyList()];
         const buf = RLP.encodeElements(arr);
-        const ptr1 = changetype<usize>(buf);
-        const ptr1len = buf.byteLength;
-
-        const ret = new ArrayBuffer(20);
-        _reflect(ReflectType.CREATE, ptr0, ptr0len, ptr1, ptr1len, changetype<usize>(abi), abi.byteLength, changetype<usize>(amount.buf), amount.buf.byteLength, changetype<usize>(ret));
-        return new Address(ret);
+        const r = _reflect(
+            ReflectType.CREATE, changetype<usize>(code),
+            changetype<usize>('init'), changetype<usize>(buf),
+            changetype<usize>(amount), changetype<usize>(abi)
+        );
+        return changetype<Address>(r)
     }
 }

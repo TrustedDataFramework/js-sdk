@@ -1,5 +1,3 @@
-import {log} from "./prelude";
-
 @external("env", "_u256")
 // type, a, b, dst, put ? : length
 declare function _u256(t: u64, left: u64, right: u64): u64;

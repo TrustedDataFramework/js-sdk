@@ -29,68 +29,46 @@ export function abort(
     unreachable()
 }
 
-let META: ArrayBuffer | null = null
 
-export function __meta(): usize {
-    if (META != null)
-        return changetype<usize>(META)
-
-    const buf = new Uint8Array(3)
-    // 有 1 个 meta 信息
-    buf[0] = 1
-    // 唯一一个 meta 信息的长度是 1
-    buf[1] = 1
-    // 这个 meta 信息表示字符串编码
-    buf[2] = CharSet.UTF16LE
-    META = buf.buffer
-    return changetype<usize>(buf.buffer)
+export function __malloc(size: u64): u64 {
+    const buf = new ArrayBuffer(i32(size))
+    return changetype<usize>(buf)
 }
 
-export function __malloc(size: i32, type: ABI_DATA_TYPE): u64 {
-    switch (type) {
-        case ABI_DATA_TYPE.STRING: {
-            const ret = u64(__new(size, idof<string>()))
-            return ret << 32 | ret
-        }
-        case ABI_DATA_TYPE.BYTES: {
-            const buf = new ArrayBuffer(size)
-            const ret = u64(changetype<usize>(buf))
-            return ret << 32 | ret
-        }
-        case ABI_DATA_TYPE.ADDRESS: {
-            let addr = new Address(new ArrayBuffer(size))
-            const ret = u64(changetype<usize>(addr.buf))
-            return (u64(changetype<usize>(addr)) << 32) | ret
-        }
-        case ABI_DATA_TYPE.U256: {
-            let u = new U256(new ArrayBuffer(size))
-            const ret = u64(changetype<usize>(u.buf))
-            return (u64(changetype<usize>(u)) << 32) | ret
-        }
+export function __change_t(t: u64, ptr: u64, size: u64): u64{
+    const buf = changetype<ArrayBuffer>(usize(ptr))
+    switch (u8(t)){
+        case ABI_DATA_TYPE.ADDRESS:
+            return changetype<usize>(new Address(buf))
+        case ABI_DATA_TYPE.BYTES:
+            return changetype<usize>(buf)
+        case ABI_DATA_TYPE.U256:
+            return changetype<usize>(new U256(buf))
+        case ABI_DATA_TYPE.STRING:
+            return changetype<usize>(String.UTF8.decode(buf))
     }
     return 0
 }
 
-export function __mpeek(ptr: usize, type: ABI_DATA_TYPE): u64 {
-    switch (type) {
+export function __peek(ptr: u64, type: u64): u64 {
+    switch (u8(type)) {
         case ABI_DATA_TYPE.STRING: {
-            let len = load<u32>(ptr - 4)
-            return (u64(len) << 32) | ptr
+            const str = changetype<string>(usize(ptr))
+            const buf = String.UTF8.encode(str, false)
+            return __peek(changetype<usize>(buf), ABI_DATA_TYPE.BYTES)
         }
         case ABI_DATA_TYPE.BYTES: {
-            const buf = changetype<ArrayBuffer>(ptr)
+            const buf = changetype<ArrayBuffer>(usize(ptr))
             let len = u64(buf.byteLength)
             return (len << 32) | ptr
         }
         case ABI_DATA_TYPE.ADDRESS: {
-            let addr = changetype<Address>(ptr)
-            let len = u64(addr.buf.byteLength)
-            return (len << 32) | u64(changetype<usize>(addr.buf))
+            let addr = changetype<Address>(usize(ptr))
+            return __peek(changetype<usize>(addr.buf), ABI_DATA_TYPE.BYTES)
         }
         case ABI_DATA_TYPE.U256: {
-            let u = changetype<U256>(ptr)
-            let len = u64(u.buf.byteLength)
-            return (len << 32) | u64(changetype<usize>(u.buf))
+            let u = changetype<U256>(usize(ptr))
+            return __peek(changetype<usize>(u.buf), ABI_DATA_TYPE.BYTES)
         }
     }
     return 0
