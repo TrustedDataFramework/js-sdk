@@ -2,6 +2,40 @@ export class U256{
     private static ONE: U256 | null = null
     public static ZERO: U256 = new U256(new Uint8Array(32).buffer)
 
+    @operator("+")
+    static __op_add(left: U256, right: U256): U256 {
+        return left.safeAdd(right);
+    }
+    @operator("-")
+    static __op_sub(left: U256, right: U256): U256 {
+        return left.safeSub(right);
+    }
+
+    @operator(">")
+    static __op_gt(left: U256, right :U256): bool {
+        return left.compareTo(right) > 0;
+    }
+    @operator(">=")
+    static __op_gte(left: U256, right :U256): bool {
+        return left.compareTo(right) >= 0;
+    }
+    @operator("<")
+    static __op_lt(left: U256, right :U256): bool {
+        return left.compareTo(right) < 0;
+    }
+    @operator("<=")
+    static __op_lte(left: U256, right :U256): bool {
+        return left.compareTo(right) <= 0;
+    }
+    @operator("==")
+    static __op_eq(left: U256, right :U256): bool {
+        return left.compareTo(right) == 0;
+    }
+
+    compareTo(u: U256): i32{
+        return Util.compareBytes(this.buf, u.buf)
+    }
+
     static one(): U256{
         if(U256.ONE != null)
             return changetype<U256>(U256.ONE)
@@ -40,7 +74,7 @@ export class U256{
 
 
     // 左移动一个 bit ，相当于乘以2
-    lshift(): U256{
+    private lshift(): U256{
         let r = new Uint8Array(32)
         let u = Uint8Array.wrap(this.buf)
         for(let i = 0; i < r.length; i++){
@@ -53,7 +87,7 @@ export class U256{
     }
 
     // 右移动一个 bit ，相当于除以2
-    rshift(): U256{
+    private rshift(): U256{
         let r = new Uint8Array(32)
         let u = Uint8Array.wrap(this.buf)
         for(let i = u.length - 1; i >= 0; i--){
@@ -84,19 +118,25 @@ export class U256{
         return ret
     }
 
-    private isZero(): bool{
+    safeAdd(u: U256): U256 {
+        const c = this.add(u);
+        assert(c.compareTo(this) >= 0 && c.compareTo(u) >= 0, "SafeMath: addition overflow");
+        return c;
+    }
+
+
+    safeSub(u: U256): U256 {
+        assert(u.compareTo(this) <= 0, "SafeMath: subtraction overflow x = " + this.toString() + " y = " + u.toString());
+        return this.sub(u);
+    }
+
+    isZero(): bool{
         const u = Uint8Array.wrap(this.buf)
         for(let i = 0; i < u.length; i++){
             if(u[i] != 0)
                 return false
         }
         return true
-    }
-
-
-    @operator("==")
-    static __op_eq(left: U256, right: U256): bool {
-        return Util.compareBytes(left.buf, right.buf) == 0
     }
 
     toString(): string{
@@ -114,6 +154,14 @@ export class U256{
         const arr = new Uint8Array(32)
         arr.set(v, arr.length - v.length)
         return new U256(arr.buffer)
+    }
+
+    static fromHex(hex: string): U256{
+        const buf = Util.decodeHex(hex)
+        assert(buf.byteLength <= 32, 'u256 overflow for str ' + hex)
+        const u = new Uint8Array(32)
+        u.set(Uint8Array.wrap(buf), 32 - buf.byteLength)
+        return new U256(u.buffer)
     }
 }
 

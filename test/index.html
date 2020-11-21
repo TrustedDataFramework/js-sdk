@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Test in html</title>
+</head>
+<body>
+    <script src="../dist/bundle.js"></script>
+    <script>
+        const t = tdsSDK
+        const vm = new t.VirtualMachine()
+        const u256 = './u256.wasm'
+
+        async function main(){
+            await vm.deploy(new Uint8Array(20), u256)        
+        }
+
+        main().catch(console.error)
+    </script>
+</body>
+</html>

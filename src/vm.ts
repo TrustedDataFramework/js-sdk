@@ -200,7 +200,7 @@ export class VirtualMachine {
 
     subBalance(addr: Binary, amount?: Digital) {
         let hex = normalizeAddress(addr)
-        let balance: bigint = this.balanceMap.get(hex)
+        let balance: bigint = this.balanceMap.get(hex) || ZERO
         let a = toBigN(amount || ZERO)
         if (balance < a)
             throw new Error(`the balance of ${hex} is not enough`)
