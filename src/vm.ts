@@ -131,6 +131,11 @@ export interface TransactionOptions {
      * 可以预设事务哈希值
      */
     hash?: Binary
+
+    /**
+     * 事务的 to
+     */
+    to?: Binary
 }
 
 
@@ -338,7 +343,7 @@ export class VirtualMachine {
     }
 
 
-    optionsToContext(opts: TransactionOptions, sender: Binary, contractAddr: Binary, amount: Digital): CallContext {
+    optionsToContext(opts: TransactionOptions, sender: Binary, contractAddr: Binary, amount: Digital, deploy: boolean = false): CallContext {
         const senderAddr = hex2bin(normalizeAddress(sender)).buffer
         const contractAddrBin = hex2bin(normalizeAddress(contractAddr)).buffer
         const n = this.nonceMap.get(bin2hex(sender)) || 0
@@ -350,14 +355,14 @@ export class VirtualMachine {
             signature: hex2bin(opts.signature || new Uint8Array(64)).buffer,
             type: null,
             sender: senderAddr,
-            to: hex2bin(normalizeAddress(contractAddr)).buffer,
             amount: toBigN(amount),
             nonce: n,
             origin: senderAddr,
             txHash: hex2bin(opts.hash || this.getTxHash(senderAddr, n)).buffer,
             contractAddress: contractAddrBin,
             readonly: false,
-            txAmount: toBigN(amount)
+            txAmount: toBigN(amount),
+            to: hex2bin(opts.to || (deploy ? '' : contractAddrBin)).buffer
         }
     }
 

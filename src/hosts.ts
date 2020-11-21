@@ -186,7 +186,7 @@ export class ContextHost extends AbstractHost {
                 return BigInt(this.wai.malloc(this.ctx.origin, ABI_DATA_TYPE.address))
             }
             case ContextType.TX_GAS_PRICE: {
-                return BigInt(this.wai.malloc(0, ABI_DATA_TYPE.u256))
+                return BigInt(this.wai.malloc(this.ctx.gasPrice, ABI_DATA_TYPE.u256))
             }
             case ContextType.TX_AMOUNT: {
                 return BigInt(this.wai.malloc(this.ctx.amount, ABI_DATA_TYPE.u256))
