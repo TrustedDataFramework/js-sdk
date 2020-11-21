@@ -1,10 +1,13 @@
-# WebAssembly Blockchain Interface
+# WebAssembly Blockchain Interface (WBI)
 
 # WASM-区块链应用程序接口
 
 
-在 WebAssembly 和宿主机的数据交换需要接口， 本文以 AssemblyScript 为例提供了一种接口的实现方案。 考虑到未来可能会使用到其他 WebAssembly 的前端语言，
+在 WebAssembly 区块链账本之间进行数据交换需要建立接口(WBI)，考虑到未来可能会使用到其他编程语言编写智能合约，
 而且 AssemblyScript 的版本也在快速迭代中，接口的设计必须具有一定的兼容多语言的能力，而且易于实现。
+
+本文以 AssemblyScript 为例提供了一种WBI的实现方案，该方案不局限于特定的编程语言语法，也没有直接操作 WebAssembly 的内存，
+也可以在 Rust，Go, C, C++ 等以 WebAssembly 为目标代码的编程语言中实现。
 
 
 ### 如何在宿主机中向 WebAssembly 注入参数
@@ -90,3 +93,5 @@ const arr = [
     `abort=${path.relative(process.cwd(), path.join(__dirname, '../lib/prelude/abort'))}`
 ]
 ```
+
+
