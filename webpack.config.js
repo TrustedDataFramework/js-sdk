@@ -19,7 +19,8 @@ module.exports = (env = {}) => ({
       crypto: false,
       buffer: false,
       http: false,
-      url: false
+      url: false,
+      path: false
     },
   },
   module: {

@@ -1,159 +1,119 @@
-@external("env", "_u256")
-// type, a, b, dst, put ? : length
-declare function _u256(t: u64, left: u64, right: u64): u64;
+export class U256{
+    private static ONE: U256 | null = null
+    public static ZERO: U256 = new U256(new Uint8Array(32).buffer)
 
-enum U256Type {
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    MOD
-}
+    static one(): U256{
+        if(U256.ONE != null)
+            return changetype<U256>(U256.ONE)
 
-export class U256 {
-    @operator("+")
-    static __op_add(left: U256, right: U256): U256 {
-        return left.safeAdd(right);
+        const buf = new Uint8Array(32)
+        buf[31] = 1
+        U256.ONE = new U256(buf.buffer)
+        return changetype<U256>(U256.ONE)
     }
 
-    @operator("-")
-    static __op_sub(left: U256, right: U256): U256 {
-        return left.safeSub(right);
+    constructor(readonly buf: ArrayBuffer){
+
     }
 
-    @operator("*")
-    static __op_mul(left: U256, right: U256): U256 {
-        return left.safeMul(right);
+    add(u: U256): U256{
+        const l = Uint8Array.wrap(this.buf)
+        const r = Uint8Array.wrap(u.buf)
+        const newData = new Uint8Array(32)
+        for (let i = 31, overflow = 0; i >= 0; i--) {
+            let v = (l[i] as u32) + (r[i] as u32) + overflow
+            newData[i] = u8(v)
+            overflow = v >>> 8
+        }
+        return new U256(newData.buffer)
     }
 
-    @operator("/")
-    static __op_div(left: U256, right: U256): U256 {
-        return left.safeDiv(right);
+    sub(u: U256): U256{
+        const r = Uint8Array.wrap(u.buf)
+        const neg = new Uint8Array(32)
+        for(let i = 0; i < neg.length; i++){
+            neg[i] = ~r[i]
+        }
+        const n = new U256(neg.buffer)
+        return this.add(n.add(U256.one()))
     }
 
-    @operator("%")
-    static __op_mod(left: U256, right: U256): U256 {
-        return left.safeMod(right);
+
+    // 左移动一个 bit ，相当于乘以2
+    lshift(): U256{
+        let r = new Uint8Array(32)
+        let u = Uint8Array.wrap(this.buf)
+        for(let i = 0; i < r.length; i++){
+            r[i] = (u[i] << 1) & 0xff
+            if(i + 1 < u.length){
+                r[i] |= (u[i + 1] & 0x80) >> 7
+            }
+        }
+        return new U256(r.buffer)
     }
 
-    @operator(">")
-    static __op_gt(left: U256, right: U256): bool {
-        return left.compareTo(right) > 0;
+    // 右移动一个 bit ，相当于除以2
+    rshift(): U256{
+        let r = new Uint8Array(32)
+        let u = Uint8Array.wrap(this.buf)
+        for(let i = u.length - 1; i >= 0; i--){
+            r[i] = (u[i] >> 1) & 0xff
+            if(i - 1 >= 0){
+                r[i] |= (u[i - 1] & 0x01) << 7
+            }
+        }
+        return new U256(r.buffer)
     }
 
-    @operator(">=")
-    static __op_gte(left: U256, right: U256): bool {
-        return left.compareTo(right) >= 0;
+    lastBit(): bool{
+        let arr = Uint8Array.wrap(this.buf)
+        return (arr[31] & 1) > 0
     }
 
-    @operator("<")
-    static __op_lt(left: U256, right: U256): bool {
-        return left.compareTo(right) < 0;
+    mul(r: U256): U256{
+        let ret = U256.ZERO
+        let l = new U256(this.buf)
+        while (!r.isZero()){
+            let n = r.lastBit()
+            if(n){
+                ret = ret.add(l)
+            }
+            l = l.lshift()
+            r = r.rshift()
+        }
+        return ret
     }
 
-    @operator("<=")
-    static __op_lte(left: U256, right: U256): bool {
-        return left.compareTo(right) <= 0;
+    private isZero(): bool{
+        const u = Uint8Array.wrap(this.buf)
+        for(let i = 0; i < u.length; i++){
+            if(u[i] != 0)
+                return false
+        }
+        return true
     }
+
 
     @operator("==")
     static __op_eq(left: U256, right: U256): bool {
-        return left.compareTo(right) == 0;
+        return Util.compareBytes(left.buf, right.buf) == 0
     }
 
-    @operator("!=")
-    static __op_ne(left: U256, right: U256): bool {
-        return left.compareTo(right) != 0;
+    toString(): string{
+        return Util.encodeHex(this.buf)
     }
 
-    static ZERO: U256 = new U256(new ArrayBuffer(0))
-    static ONE: U256 = U256.fromU64(1)
-
-    static fromU64(u: u64): U256 {
-        const buf = Util.u64ToBytes(u);
-        return new U256(buf);
+    u64(): u64{
+        const arr = this.buf.slice(24, 32)
+        return Util.bytesToU64(arr)
     }
 
-    constructor(readonly buf: ArrayBuffer) {
-        assert(buf.byteLength <= 32, 'invalid u256: overflow')
-    }
-
-    private arithmetic(t: U256Type, u: U256): U256 {
-        let r = _u256(t, changetype<usize>(this), changetype<usize>(u))
-        return changetype<U256>(usize(r))
-    }
-
-    add(u: U256): U256 {
-        return this.arithmetic(U256Type.ADD, u);
-    }
-
-    safeAdd(u: U256): U256 {
-        const c = this.add(u);
-        assert(c.compareTo(this) >= 0 && c.compareTo(u) >= 0, "SafeMath: addition overflow");
-        return c;
-    }
-
-    sub(u: U256): U256 {
-        return this.arithmetic(U256Type.SUB, u);
-    }
-
-    safeSub(u: U256): U256 {
-        assert(u.compareTo(this) <= 0, "SafeMath: subtraction overflow x = " + this.toString() + " y = " + u.toString());
-        return this.sub(u);
-    }
-
-    mul(u: U256): U256 {
-        return this.arithmetic(U256Type.MUL, u);
-    }
-
-    safeMul(u: U256): U256 {
-        if (this == u) {
-            return U256.ZERO;
-        }
-
-        const c = this.mul(u);
-        assert(c.div(this).compareTo(u) == 0, "SafeMath: multiplication overflow ");
-        return c;
-    }
-
-    div(u: U256): U256 {
-        return this.arithmetic(U256Type.DIV, u);
-    }
-
-    safeDiv(u: U256): U256 {
-        assert(u.compareTo(U256.ZERO) > 0, "SafeMath: modulo by zero");
-        return this.div(u);
-    }
-
-    mod(u: U256): U256 {
-        return this.arithmetic(U256Type.MOD, u);
-    }
-
-    safeMod(u: U256): U256 {
-        assert(u.compareTo(U256.ZERO) > 0, "SafeMath: modulo by zero");
-        return this.mod(u);
-    }
-
-    compareTo(u: U256): i32 {
-        return Util.compareBytes(this.buf, u.buf);
-    }
-
-    toString(): string {
-        let bf = new ArrayBuffer(32)
-        let v = Uint8Array.wrap(bf)
-        v.set(Uint8Array.wrap(this.buf), 32 - this.buf.byteLength)
-        return Util.encodeHex(bf)
-    }
-
-    static fromHex(str: string): U256 {
-        let bf = Util.decodeHex(str)
-        assert(bf.byteLength <= 32, 'u256 overflow')
-        let v = Uint8Array.wrap(bf)
-        let i = 0
-        while(v[i] == 0){
-            i++
-        }
-        return new U256(bf.slice(i, bf.byteLength))
+    static fromU64(u: u64): U256{
+        const bytes = Util.u64ToBytes(u)
+        const v = Uint8Array.wrap(bytes)
+        const arr = new Uint8Array(32)
+        arr.set(v, arr.length - v.length)
+        return new U256(arr.buffer)
     }
 }
 
@@ -229,11 +189,11 @@ export class Util {
 
     static bytesToU64(bytes: ArrayBuffer): u64 {
         let v = Uint8Array.wrap(bytes)
-        let u = 0
+        let u: u64 = 0
         // 低位在后面
         let j = 0
         for(let i = v.length - 1; i >= 0; i--){
-            u |= v[i] << (u8(j) * 8)
+            u |= u64(v[i]) << (u8(j) << 3)
             j ++
         }
         return u
