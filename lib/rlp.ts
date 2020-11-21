@@ -1,5 +1,6 @@
 import { Address } from './context'
-import { Util, U256} from './util'
+import { Util } from './util'
+import { U256 } from './u256'
 
 const OFFSET_SHORT_LIST = 0xc0
 const OFFSET_SHORT_ITEM = 0x80

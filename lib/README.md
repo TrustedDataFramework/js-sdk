@@ -94,4 +94,8 @@ const arr = [
 ]
 ```
 
+### 参考示例
+
+WBI 的实现可以参考 src/vm/WasmInterface 中的 malloc 和 peek
+
 

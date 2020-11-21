@@ -1,7 +1,7 @@
 import { normalizeAddress, bin2hex, bin2str, hex2bin, encodeBE, toSafeInt, decodeBE, toBigN, convert } from "./utils"
 import { ABI, getContractAddress, normalizeParams } from "./contract"
-import { Binary, AbiInput, Digital, ZERO, Readable } from "./constants"
-import { CallContext, ContextHost, DBHost, EventHost, Log, Reflect, Transfer, AbstractHost } from './hosts'
+import { Binary, AbiInput, Digital, ZERO, Readable, constants } from "./constants"
+import { ContextHost, DBHost, EventHost, Log, Reflect, Transfer, AbstractHost } from './hosts'
 
 import * as rlp from './rlp'
 import { ABI_DATA_TYPE } from "./constants"
@@ -9,6 +9,130 @@ import { sm3 } from '@salaku/sm-crypto'
 
 const utf8Decoder = new TextDecoder()
 const utf8Encoder = new TextEncoder()
+
+export enum TransactionType {
+    COIN_BASE,
+    TRANSFER,
+    CONTRACT_DEPLOY,
+    CONTRACT_CALL
+}
+
+// 合约调用上下文
+
+export interface CallContext {
+    /**
+     * 事务版本号
+     */
+    version: number
+
+    /**
+     * 事务构造时间
+     */
+    createdAt: number
+
+    /**
+     * 事务的 gas 限制
+     */
+    gasLimit: bigint
+
+    /**
+     * 事务的 gas 单价
+     */
+    gasPrice: bigint
+
+    /**
+     * 事务的签名
+     */
+    signature: ArrayBuffer
+
+
+    /**
+     * 事务的类型
+     */
+    type: TransactionType
+
+    /**
+     * 当前调用者，可能是用户地址或者合约地址
+     */
+    sender: ArrayBuffer
+
+    /**
+     * 事务的 to
+     */
+    to: ArrayBuffer
+
+    /**
+     * 当前调用的 amount
+     */
+    amount: bigint
+
+    /**
+     * 事务的 amount
+     */
+    txAmount: bigint
+
+    /**
+     * 事务的 nonce
+     */
+    nonce: number
+
+    /**
+     * 事务的 from 对应的地址
+     */
+    origin: ArrayBuffer
+
+    /**
+     * 事务的哈希值
+     */
+    txHash: ArrayBuffer
+
+    /**
+     * 当前执行的合约的地址
+     */
+    contractAddress: ArrayBuffer
+
+    /**
+     * 当前调用的链上数据是否处于只读状态
+     */
+    readonly: boolean
+}
+
+
+/**
+ * 通过虚拟机部署、调用合约时注入的参数
+ */
+export interface TransactionOptions {
+    /**
+     * 事务版本号
+     */
+    version?: Digital
+
+    /**
+     * 事务构造的时间戳(秒)
+     */
+    createdAt?: Digital
+
+    /**
+     * gas 使用限制
+     */
+    gasLimit?: Digital
+
+    /**
+     * gas 单价
+     */
+    gasPrice?: Digital
+
+    /**
+     * 事务签名
+     */
+    signature?: Binary
+
+    /**
+     * 可以预设事务哈希值
+     */
+    hash?: Binary
+}
+
 
 /**
  * 虚拟机实例
@@ -55,12 +179,12 @@ export class WasmInterface {
         }
     }
 
-    malloc(x: string | bigint | ArrayBuffer | Uint8Array | number | boolean, type: ABI_DATA_TYPE): number | bigint{
+    malloc(x: string | bigint | ArrayBuffer | Uint8Array | number | boolean, type: ABI_DATA_TYPE): number | bigint {
         let bin: ArrayBuffer
-        if(typeof x === 'boolean')
+        if (typeof x === 'boolean')
             x = x ? 1 : 0
         if (typeof x === 'string') {
-            switch(type){
+            switch (type) {
                 case ABI_DATA_TYPE.bytes:
                 case ABI_DATA_TYPE.address:
                     bin = hex2bin(x).buffer
@@ -75,12 +199,11 @@ export class WasmInterface {
                 case ABI_DATA_TYPE.i64:
                     return toSafeInt(BigInt((convert(x, type))))
                 case ABI_DATA_TYPE.f64:
-                    return parseFloat(x)        
+                    return parseFloat(x)
             }
         }
         if (typeof x === 'bigint' || typeof x === 'number') {
-            bin = encodeBE(x).buffer
-            switch(type){
+            switch (type) {
                 case ABI_DATA_TYPE.bytes:
                 case ABI_DATA_TYPE.address:
                     throw new Error(`cannot convert ${x} to bytes or address`)
@@ -94,28 +217,28 @@ export class WasmInterface {
                 case ABI_DATA_TYPE.i64:
                     return toSafeInt(x)
                 case ABI_DATA_TYPE.f64:
-                    return Number(x)   
-            }            
+                    return Number(x)
+            }
         }
         if (x instanceof ArrayBuffer) {
             bin = x
-            switch(type){
+            switch (type) {
                 case ABI_DATA_TYPE.bytes:
                 case ABI_DATA_TYPE.address:
                     break
                 default:
-                    throw new Error(`cannot convert binary to ${ABI_DATA_TYPE[type]}`)      
-            }              
+                    throw new Error(`cannot convert binary to ${ABI_DATA_TYPE[type]}`)
+            }
         }
-        if (x instanceof Uint8Array){
+        if (x instanceof Uint8Array) {
             bin = x.buffer
-            switch(type){
+            switch (type) {
                 case ABI_DATA_TYPE.bytes:
                 case ABI_DATA_TYPE.address:
                     break
                 default:
-                    throw new Error(`cannot convert binary to ${ABI_DATA_TYPE[type]}`)      
-            }   
+                    throw new Error(`cannot convert binary to ${ABI_DATA_TYPE[type]}`)
+            }
         }
         let len = bin.byteLength
         const p0 = this.ins.exports.__malloc(BigInt(len))
@@ -163,7 +286,6 @@ export class VirtualMachine {
     constructor() {
         if (typeof WebAssembly !== 'object')
             throw new Error('webassembly not available here')
-
         this.nextBlock()
     }
 
@@ -215,6 +337,31 @@ export class VirtualMachine {
         return n
     }
 
+
+    optionsToContext(opts: TransactionOptions, sender: Binary, contractAddr: Binary, amount: Digital): CallContext {
+        const senderAddr = hex2bin(normalizeAddress(sender)).buffer
+        const contractAddrBin = hex2bin(normalizeAddress(contractAddr)).buffer
+        const n = this.nonceMap.get(bin2hex(sender)) || 0
+        return {
+            version: <number>toSafeInt(opts.version || constants.POA_VERSION),
+            createdAt: <number>toSafeInt(opts.createdAt || this.now),
+            gasLimit: toBigN(opts.gasLimit || 0),
+            gasPrice: toBigN(opts.gasPrice || 0),
+            signature: hex2bin(opts.signature || new Uint8Array(64)).buffer,
+            type: null,
+            sender: senderAddr,
+            to: hex2bin(normalizeAddress(contractAddr)).buffer,
+            amount: toBigN(amount),
+            nonce: n,
+            origin: senderAddr,
+            txHash: hex2bin(opts.hash || this.getTxHash(senderAddr, n)).buffer,
+            contractAddress: contractAddrBin,
+            readonly: false,
+            txAmount: toBigN(amount)
+        }
+    }
+
+
     /**
      * 发送事务调用合约
      * @param sender 事务发送着
@@ -222,28 +369,22 @@ export class VirtualMachine {
      * @param method 调用的方法
      * @param params 调用参数
      * @param amount 事务的 amount
+     * @param opts
      */
-    call(sender: Binary, addr: Binary, method: string, params?: AbiInput | AbiInput[] | Record<string, AbiInput>, amount?: Digital): Promise<Readable> {
-        let origin = hex2bin(normalizeAddress(sender)).buffer
-        const n = this.increaseNonce(sender)
-        return this.callInternal(method, {
-            type: null,
-            sender: origin,
-            to: hex2bin(normalizeAddress(addr)).buffer,
-            amount: toBigN(amount || ZERO),
-            nonce: n,
-            origin: origin,
-            txHash: hex2bin(sm3(rlp.encode([origin, n]))).buffer,
-            contractAddress: hex2bin(normalizeAddress(addr)).buffer,
-            readonly: false
-        }, params)
+    async call(sender: Binary, addr: Binary, method: string, params: AbiInput | AbiInput[] | Record<string, AbiInput> = [], amount: Digital = 0, opts: TransactionOptions = {}): Promise<Readable> {
+        this.increaseNonce(sender)
+        const ctx = this.optionsToContext(opts, sender, addr, amount)
+        ctx.type = TransactionType.CONTRACT_CALL
+        const ret = await this.callInternal(method, ctx, params, opts)
+        this.nextBlock()
+        return ret
     }
 
-    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<Readable> {
+    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>, opts?: TransactionOptions): Promise<Readable> {
         // 1. substract amount
         this.subBalance(ctx.sender, ctx.amount)
         this.addBalance(ctx.contractAddress, ctx.amount)
-        ctx.type = method === 'init' ? 16 : 17
+        ctx.type = method === 'init' ? TransactionType.CONTRACT_DEPLOY : TransactionType.CONTRACT_CALL
         const file = this.contractCode.get(bin2hex(ctx.contractAddress))
         const abi = await this.fetchABI(file)
 
@@ -290,7 +431,7 @@ export class VirtualMachine {
 
     }
 
-    extractRet(ins: VMInstance, offset: number | bigint, type: ABI_DATA_TYPE): Readable{
+    extractRet(ins: VMInstance, offset: number | bigint, type: ABI_DATA_TYPE): Readable {
         let wai = new WasmInterface(ins)
         switch (type) {
             case ABI_DATA_TYPE.bool:
@@ -311,58 +452,44 @@ export class VirtualMachine {
             }
             case ABI_DATA_TYPE.string: {
                 let peeked = wai.peek(offset, type)
-                return <string> peeked
+                return <string>peeked
             }
             case ABI_DATA_TYPE.address:
             case ABI_DATA_TYPE.bytes: {
-                let peeked = <ArrayBuffer> wai.peek(offset, type)
+                let peeked = <ArrayBuffer>wai.peek(offset, type)
                 return bin2hex(peeked)
             }
             case ABI_DATA_TYPE.u256: {
-                return <bigint> wai.peek(offset, type)
+                return <bigint>wai.peek(offset, type)
             }
         }
     }
 
-    private getTxHash(origin: ArrayBuffer, nonce: number): ArrayBuffer{
+    private getTxHash(origin: ArrayBuffer, nonce: number): ArrayBuffer {
         return hex2bin(sm3(rlp.encode([origin, nonce]))).buffer
     }
 
-    async view(): Promise<Readable> {
-        return null
-    }
 
     // 合约部署
-    async deploy(sender: Binary, wasmFile: string, parameters?: AbiInput | AbiInput[] | Record<string, AbiInput>, amount?: Digital): Promise<Readable> {
+    async deploy(sender: Binary, wasmFile: string, parameters: AbiInput | AbiInput[] | Record<string, AbiInput> = [], amount: Digital = 0, opts: TransactionOptions = {}): Promise<Readable> {
         let senderAddress = normalizeAddress(sender)
-        let senderAddressBuffer = hex2bin(sender).buffer
-        // 用 keccak256(rlp([sender, nonce  ])) 模拟事务哈希值 计算地址
         const n = this.increaseNonce(sender)
-        const txHash = this.getTxHash(senderAddressBuffer, n)
         const contractAddress = getContractAddress(senderAddress, n)
-        const contractAddressHex = bin2hex(contractAddress)
-
+        const ctx = this.optionsToContext(opts, sender, contractAddress, amount)
+        ctx.type = TransactionType.CONTRACT_DEPLOY
         const abi = await this.fetchABI(wasmFile)
-        this.abiCache.set(contractAddressHex, abi)
-        this.contractCode.set(contractAddressHex, wasmFile)
+        this.abiCache.set(contractAddress, abi)
+        this.contractCode.set(contractAddress, wasmFile)
 
         const a = abi.filter(x => x.type === 'function' && x.name === 'init')[0]
+
+        let ret
         // try to execute init function
         if (a) {
-            return this.callInternal('init', {
-                type: null,
-                sender: hex2bin(sender).buffer,
-                to: new Uint8Array(20).buffer,
-                amount: toBigN(amount || ZERO),
-                nonce: n,
-                origin: senderAddressBuffer,
-                txHash: txHash,
-                contractAddress: hex2bin(contractAddress).buffer,
-                readonly: false
-            }, parameters)
+            ret = await this.callInternal('init', ctx, parameters)
         }
         this.nextBlock()
-        return null
+        return ret
     }
 
     // 根据文件名规范获取 abi

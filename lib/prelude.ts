@@ -1,5 +1,5 @@
 import { ABI_DATA_TYPE, Address } from "./context"
-import { U256 } from "./util"
+import { U256 } from "./u256"
 
 // @ts-ignore
 @external("env", "_log")

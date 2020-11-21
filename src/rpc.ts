@@ -186,10 +186,9 @@ export class RPC {
      * @param {string} host  主机名
      * @param {string | number} port  端口号
      */
-    constructor(host: string, port?: string | number) {
-        this.host = host || 'localhost'
-        this.port = typeof port === 'number' ? port : (parseInt(port || '80'))
-
+    constructor(host: string = 'localhost', port: string | number = 80) {
+        this.host = host
+        this.port = typeof port === 'string' ? parseInt(port) : port
         this.callbacks = new Map()
         this.id2key = new Map()
         this.id2hash = new Map()

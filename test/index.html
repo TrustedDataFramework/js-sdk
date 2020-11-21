@@ -1,22 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contract Test in html</title>
 </head>
+
 <body>
     <script src="../dist/bundle.js"></script>
     <script>
         const t = tdsSDK
         const vm = new t.VirtualMachine()
-        const u256 = './u256.wasm'
 
-        async function main(){
-            await vm.deploy(new Uint8Array(20), u256)        
+        const origin = '9cbf30db111483e4b84e77ca0e39378fd7605e1b'
+        const amount = 1234567890
+        async function main() {
+            await vm.deploy(origin, './u256.wasm')
+            vm.alloc(origin, amount)
+            vm.now = 123456789
+            vm.parentHash = t.hex2bin('9cbf30db111483e4b84e77ca0e39378fd7605e1b')
+            await vm.deploy(origin, './context.wasm', [], amount, {
+                version: 1234,
+                createdAt: 12345,
+                gasLimit: 12345678,
+                gasPrice: 123456789,
+                signature: 'aabbccddeeff',
+                hash: 'aabbccddeeff'
+            })
+            await vm.deploy(origin, './db.wasm')
         }
 
         main().catch(console.error)
     </script>
 </body>
+
 </html>

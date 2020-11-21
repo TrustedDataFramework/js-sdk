@@ -1,8 +1,9 @@
-import { isZero, VirtualMachine, WasmInterface, VMInstance} from './vm'
-import { bin2hex, str2bin } from './utils'
-import { Contract } from './contract'
+import {isZero, VirtualMachine, VMInstance, WasmInterface} from './vm'
+import {bin2hex, str2bin} from './utils'
+import {Contract} from './contract'
 import * as rlp from './rlp'
-import { ABI_DATA_TYPE, ZERO} from './constants'
+import {ABI_DATA_TYPE, ZERO} from './constants'
+import { CallContext } from './vm'
 
 
 export abstract class AbstractHost {
@@ -34,6 +35,9 @@ export class Log extends AbstractHost {
     }
 
     execute(args: (number | bigint)[]): void {
+        if(this.wai === undefined){
+            console.log('undefined')
+        }
         let s = <string> this.wai.peek(args[0], ABI_DATA_TYPE.string)
         console.log(s)
     }
@@ -61,18 +65,6 @@ enum ContextType {
     MSG_AMOUNT,
     CONTRACT_CODE,
     CONTRACT_ABI
-}
-
-export interface CallContext {
-    type: number
-    sender: ArrayBuffer
-    to: ArrayBuffer
-    amount: bigint
-    nonce: number
-    origin: ArrayBuffer
-    txHash: ArrayBuffer
-    contractAddress: ArrayBuffer
-    readonly: boolean
 }
 
 enum DBType {
@@ -115,7 +107,7 @@ export class DBHost extends AbstractHost {
             case DBType.SET: {
                 let addr = bin2hex(this.ctx.contractAddress)
                 let k = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
-                let val = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
+                let val = <ArrayBuffer> this.wai.peek(args[2], ABI_DATA_TYPE.bytes)
                 let m = this.world.storage.get(addr) || new Map<string, ArrayBuffer>()
                 m.set(bin2hex(k), val)
                 this.world.storage.set(addr, m)
@@ -168,76 +160,80 @@ export class ContextHost extends AbstractHost {
         this.ctx = ctx
     }
 
-    execute(args: bigint[]): bigint | number {
+    execute(args: bigint[]): bigint{
         let type = Number(args[0])
 
         switch (type) {
             case ContextType.HEADER_PARENT_HASH: {
-                return this.wai.malloc(this.world.parentHash, ABI_DATA_TYPE.bytes)
+                return BigInt(this.wai.malloc(this.world.parentHash, ABI_DATA_TYPE.bytes))
             }
             case ContextType.HEADER_CREATED_AT: {
-                return this.world.now
+                return BigInt(this.world.now)
             }
             case ContextType.HEADER_HEIGHT: {
-                return this.world.height
+                return BigInt(this.world.height)
             }
             case ContextType.TX_TYPE: {
-                return this.ctx.type
+                return BigInt(this.ctx.type)
+            }
+            case ContextType.TX_NONCE:{
+                return BigInt(this.ctx.nonce)
             }
             case ContextType.TX_CREATED_AT: {
-                return Math.floor(new Date().valueOf() / 1000)
+                return BigInt(this.ctx.createdAt)
             }
             case ContextType.TX_ORIGIN: {
-                return this.wai.malloc(this.ctx.origin, ABI_DATA_TYPE.address)
+                return BigInt(this.wai.malloc(this.ctx.origin, ABI_DATA_TYPE.address))
             }
             case ContextType.TX_GAS_PRICE: {
-                return 0
+                return BigInt(this.wai.malloc(0, ABI_DATA_TYPE.u256))
             }
             case ContextType.TX_AMOUNT: {
-                return this.wai.malloc(this.ctx.amount, ABI_DATA_TYPE.u256)
+                return BigInt(this.wai.malloc(this.ctx.amount, ABI_DATA_TYPE.u256))
             }
             case ContextType.TX_TO: {
-                return this.wai.malloc(this.ctx.to, ABI_DATA_TYPE.bytes)
+                return BigInt(this.wai.malloc(this.ctx.to, ABI_DATA_TYPE.address))
             }
             case ContextType.TX_SIGNATURE: {
-                const sig = new ArrayBuffer(64)
-                return this.wai.malloc(sig, ABI_DATA_TYPE.bytes)
+                return BigInt(this.wai.malloc(this.ctx.signature, ABI_DATA_TYPE.bytes))
             }
             case ContextType.TX_HASH: {
-                return this.wai.malloc(this.ctx.txHash, ABI_DATA_TYPE.bytes)
+                return BigInt(this.wai.malloc(this.ctx.txHash, ABI_DATA_TYPE.bytes))
             }
             case ContextType.CONTRACT_ADDRESS: {
-                return this.wai.malloc(this.ctx.contractAddress, ABI_DATA_TYPE.address)
+                return BigInt(this.wai.malloc(this.ctx.contractAddress, ABI_DATA_TYPE.address))
             }
             case ContextType.CONTRACT_NONCE: {
-                return this.world.nonceMap.get(bin2hex(this.ctx.contractAddress)) || 0
+                return BigInt(this.world.nonceMap.get(bin2hex(this.ctx.contractAddress)) || 0)
             }
             case ContextType.ACCOUNT_NONCE: {
                 let addr = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
-                return this.world.nonceMap.get(bin2hex(addr)) || 0
+                return BigInt(this.world.nonceMap.get(bin2hex(addr)) || 0)
             }
             case ContextType.ACCOUNT_BALANCE: {
                 let addr = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
                 let b: bigint = this.world.balanceMap.get(bin2hex(addr)) || ZERO
-                return this.wai.malloc(b, ABI_DATA_TYPE.u256)
+                return BigInt(this.wai.malloc(b, ABI_DATA_TYPE.u256))
             }
             case ContextType.MSG_SENDER: {
-                return this.wai.malloc(this.ctx.sender, ABI_DATA_TYPE.address)
+                return BigInt(this.wai.malloc(this.ctx.sender, ABI_DATA_TYPE.address))
             }
             case ContextType.MSG_AMOUNT: {
-                return this.wai.malloc(this.ctx.amount, ABI_DATA_TYPE.u256)               
+                return BigInt(this.wai.malloc(this.ctx.amount || ZERO, ABI_DATA_TYPE.u256))
             }
             case ContextType.CONTRACT_CODE: {
                 let addr = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
                 let code = this.world.contractCode.get(bin2hex(addr))
-                return this.wai.malloc(str2bin(code), ABI_DATA_TYPE.bytes)
+                return BigInt(this.wai.malloc(str2bin(code), ABI_DATA_TYPE.bytes))
             }
             case ContextType.CONTRACT_ABI: {
                 let abi = this.world.abiCache.get(bin2hex(this.ctx.contractAddress))
                 const c = new Contract('', abi)
                 let data = rlp.encode(c.abiToBinary())
-                return this.wai.malloc(data, ABI_DATA_TYPE.bytes)
+                return BigInt(this.wai.malloc(data, ABI_DATA_TYPE.bytes))
             }
+            default:
+                throw new Error(`unimplemented: ${ContextType[type]}`)
         }
     }
     name(): string {

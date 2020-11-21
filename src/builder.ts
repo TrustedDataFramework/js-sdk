@@ -15,11 +15,11 @@ export class TransactionBuilder {
     nonce: bigint | number
 
     constructor(
-        version?: Digital,
-        sk?: Binary,
-        gasLimit?: Digital,
-        gasPrice?: Digital,
-        nonce?: Digital
+        version: Digital = constants.POA_VERSION,
+        sk: Binary = '',
+        gasLimit: Digital = 0,
+        gasPrice: Digital = 0,
+        nonce: Digital = 0
     ) {
         this.version = <number>toSafeInt(version || 0)
         this.sk = bin2hex(sk || '')

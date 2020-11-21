@@ -1,5 +1,6 @@
 import { RLP } from "./rlp"
-import { Util, U256 } from "./util"
+import { Util } from "./util"
+import { U256 } from './u256'
 
 function __getAbiOf<T>(): ABI_DATA_TYPE {
     if (isBoolean<T>()) {
@@ -40,7 +41,7 @@ export enum ABI_DATA_TYPE {
 
 // @ts-ignore
 @external("env", "_context")
-// type, dst, put ?
+// type, address?
 declare function _context(type: u64, arg0: u64): u64;
 
 // @ts-ignore

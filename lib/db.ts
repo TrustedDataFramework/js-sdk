@@ -83,6 +83,6 @@ export class DB {
 
     static get(key: ArrayBuffer): ArrayBuffer {
         let r = _db(Type.GET, changetype<usize>(key), 0)
-        return changetype<ArrayBuffer>(r)
+        return changetype<ArrayBuffer>(usize(r))
     }
 }
