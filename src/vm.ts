@@ -168,9 +168,9 @@ export class WasmInterface {
 
 
     peek(offset: number | bigint, type: ABI_DATA_TYPE): string | bigint | ArrayBuffer {
-        const lenAndStart = this.ins.exports.__peek(BigInt(offset), BigInt(type))
-        const len = Number(lenAndStart >> BigInt(32))
-        const start = Number(lenAndStart & BigInt(0xffffffff))
+        const startAndLen = this.ins.exports.__peek(BigInt(offset), BigInt(type))
+        const len = Number(startAndLen & BigInt(0xffffffff))
+        const start = Number(startAndLen >> BigInt(32))
         let bin = this.loadN(start, len)
         switch (type) {
             case ABI_DATA_TYPE.string: {
@@ -287,6 +287,8 @@ export class VirtualMachine {
     now: number
 
     storage: Map<string, Map<string, ArrayBuffer>> = new Map()
+
+    hosts: Map<string, Function> = new Map()
 
     constructor() {
         if (typeof WebAssembly !== 'object')
@@ -408,6 +410,10 @@ export class VirtualMachine {
             env[h.name()] = (...args: (number | bigint)[]) => {
                 return h.execute(args)
             }
+        })
+
+        this.hosts.forEach((v, k) => {
+            env[k] = v
         })
 
         let instance = <VMInstance>(await WebAssembly.instantiateStreaming(fetch(file), {

@@ -10,13 +10,6 @@ export function log(a: string): void {
     _log(changetype<usize>(a))
 }
 
-
-enum CharSet {
-    UTF8,
-    UTF16,
-    UTF16LE
-}
-
 export function abort(
     message: string | null,
     fileName: string | null,
@@ -60,7 +53,7 @@ export function __peek(ptr: u64, type: u64): u64 {
         case ABI_DATA_TYPE.BYTES: {
             const buf = changetype<ArrayBuffer>(usize(ptr))
             let len = u64(buf.byteLength)
-            return (len << 32) | ptr
+            return (ptr << 32) | len
         }
         case ABI_DATA_TYPE.ADDRESS: {
             let addr = changetype<Address>(usize(ptr))

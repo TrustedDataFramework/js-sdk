@@ -75,7 +75,7 @@ export function __peek(ptr: u64, type: ABI_DATA_TYPE): u64{
 }
 ```
 
-它的作用是告诉 WebAssembly，宿主机需要访问一段内存，以便转换成宿主机需要的格式，返回的类型是 u64 类型，这个 u64 类型的高 32 位（ 通过 i >>> 32 获取) 表示的是返回参数的二进制长度，低32位表示的是用于填充的内存起始位置
+它的作用是告诉 WebAssembly，宿主机需要访问一段内存，以便转换成宿主机需要的格式，返回的类型是 u64 类型，这个 u64 类型的低 32 位（ 通过 i & 0xffffffff 获取) 表示的是返回参数的二进制长度，高32位表示的是用于填充的内存起始位置
 
 ### 命令行参数
 
@@ -97,5 +97,82 @@ const arr = [
 ### 参考示例
 
 WBI 的实现可以参考 src/vm/WasmInterface 中的 malloc 和 peek
+
+Rust 的实现可以参考如下代码
+
+
+```rust
+extern "C" {
+    pub fn _log(a: u64);
+}
+
+unsafe fn log(msg: &str) {
+    let d: Data = Data { ptr: msg.as_ptr(), len: msg.len() as u32 };
+    _log(&d as *const _ as u64);
+}
+
+enum AbiDataType {
+    BOOL,
+    // 0
+    I64,
+    // 1
+    U64,
+    //  2 BN
+    F64,
+    STRING,
+    // 3 string
+    BYTES,
+    // 4
+    ADDRESS,
+    // 5
+    U256, // 6
+}
+
+// WBI 在 rust 中的实现
+// 因为 rust 没有内存管理，需要用一个结构体来保存字节流的长度
+#[repr(C)]
+#[no_mangle]
+pub struct Data {
+    ptr: *const u8,
+    len: u32,
+}
+
+impl Data {
+    pub unsafe fn string(&self) -> String {
+        let mut bytes: Vec<u8> = Vec::with_capacity(self.len as usize);
+        bytes.set_len(self.len as usize);
+        for x in 0..self.len{
+            bytes[x as usize] = *(self.ptr.offset(x as isize))
+        }
+        return String::from_utf8_unchecked(bytes);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern fn __malloc(size: u64) -> u64 {
+    let mut bytes: Vec<u8> = Vec::with_capacity(size as usize);
+    bytes.set_len(size as usize);
+    return bytes.as_ptr() as u64;
+}
+
+#[no_mangle]
+pub unsafe extern fn __change_t(t: u64, ptr: u64, size: u64) -> u64 {
+    let d = Data { ptr: ptr as usize as *const u8, len: size as u32 };
+    return &d as *const _ as u64;
+}
+
+
+#[no_mangle]
+pub unsafe extern fn __peek(ptr: u64, t: u64) -> u64 {
+    let p: *const Data = ptr as usize as *const _;
+    let len = (*p).len;
+    return (((*p).ptr as u64) << 32) | (len as u64);
+}
+
+#[no_mangle]
+pub unsafe extern fn init(s: &Data) {
+    log(s.string().as_str());
+}
+```
 
 
