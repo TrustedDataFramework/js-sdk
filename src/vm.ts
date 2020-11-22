@@ -398,6 +398,7 @@ export class VirtualMachine {
         let mem = new WebAssembly.Memory({ initial: 10, maximum: 65535 })
         const env = {
             memory: mem,
+            _nop: () => undefined
         }
 
         const hosts: AbstractHost[] = [
