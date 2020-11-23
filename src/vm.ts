@@ -205,7 +205,7 @@ export class WasmInterface {
                     break
                 case ABI_DATA_TYPE.u64:
                 case ABI_DATA_TYPE.i64:
-                    return toSafeInt(BigInt((convert(x, type))))
+                    return BigInt((convert(x, type)))
                 case ABI_DATA_TYPE.f64:
                     return parseFloat(x)
             }
@@ -223,7 +223,7 @@ export class WasmInterface {
                     break
                 case ABI_DATA_TYPE.u64:
                 case ABI_DATA_TYPE.i64:
-                    return toSafeInt(x)
+                    return BigInt(x)
                 case ABI_DATA_TYPE.f64:
                     return Number(x)
             }
@@ -292,6 +292,56 @@ export class VirtualMachine {
     storage: Map<string, Map<string, ArrayBuffer>> = new Map()
 
     hosts: Map<string, Function> = new Map()
+
+    map2Array<V>(m: Map<string, V>): [Uint8Array, V][]{
+        const ret = []
+        m.forEach((v, k) => ret.push([hex2bin(k), v]))
+        return ret
+    }
+
+    dump(): ArrayBuffer{
+        const storageArray = this.map2Array(this.storage)
+        const enc: [Uint8Array, [Uint8Array, ArrayBuffer][]][] = storageArray.map(x => [x[0], this.map2Array(x[1])])
+        const arr = [
+            this.height, this.parentHash, this.hash, this.map2Array(this.contractCode),
+            this.map2Array(this.nonceMap), this.map2Array(this.balanceMap),
+            this.now, enc
+        ]
+        return rlp.encode(arr)
+    }
+
+    static fromDump(dumped: ArrayBuffer | Uint8Array): VirtualMachine{
+        const decoded = rlp.decode(dumped)
+        const vm = new VirtualMachine()
+        vm.height = rlp.byteArrayToInt(<Uint8Array> decoded[0])
+        vm.parentHash = (<Uint8Array> decoded[1]).buffer
+        vm.hash = (decoded[2] as Uint8Array).buffer;
+        (decoded[3] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
+            vm.contractCode.set(bin2hex(arr[0]), bin2str(arr[1]))
+        });
+
+        (decoded[4] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
+            vm.nonceMap.set(bin2hex(arr[0]), rlp.byteArrayToInt(arr[1]))
+        });    
+
+        (decoded[5] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
+            vm.balanceMap.set(bin2hex(arr[0]), toBigN(arr[1]))
+        });
+
+        vm.now = rlp.byteArrayToInt(<Uint8Array> decoded[6]);
+        
+        (decoded[7] as any[]).forEach((arr: [Uint8Array, [Uint8Array, Uint8Array][]]) => {
+            const k = bin2hex(arr[0])
+            if(!vm.storage.has(k)) 
+                vm.storage.set(k, new Map())
+            const m: Map<string, ArrayBuffer> = vm.storage.get(k);
+            (arr[1]).forEach((kv) => {
+                m.set(bin2hex(kv[0]), kv[1].buffer)
+            })    
+        })      
+
+        return vm
+    }
 
     constructor() {
         if (typeof WebAssembly !== 'object')
@@ -457,7 +507,7 @@ export class VirtualMachine {
         const args = []
         for (let i = 0; i < a.inputs.length; i++) {
             const t = ABI_DATA_TYPE[a.inputs[i].type]
-            args.push(wai.malloc(arr[i], t), t)
+            args.push(wai.malloc(arr[i], t))
         }
         let ret = instance.exports[method].apply(window, args)
 

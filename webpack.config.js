@@ -6,7 +6,7 @@ module.exports = (env = {}) => ({
   entry: path.join(__dirname, "src/index.ts"),
   output: {
     path: path.join(__dirname, "dist"),
-    filename: "bundle.js",
+    filename: "tds-sdk.min.js",
     library: "tdsSDK",
     libraryTarget: "umd",
   },
