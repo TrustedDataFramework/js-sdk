@@ -16,7 +16,9 @@
         const origin = '9cbf30db111483e4b84e77ca0e39378fd7605e1b'
         const amount = 1234567890
         async function main() {
+            const u256Addr = t.getContractAddress(origin, 1)
             await vm.deploy(origin, './u256.wasm')
+            console.log(await vm.view(u256Addr, 'getOne'))
             vm.alloc(origin, amount)
             vm.now = 123456789
             vm.parentHash = t.hex2bin('9cbf30db111483e4b84e77ca0e39378fd7605e1b')

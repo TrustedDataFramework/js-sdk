@@ -81,6 +81,8 @@ export class EventHost extends AbstractHost {
     }
 
     execute(args: bigint[]): void {
+        if(this.ctx.readonly)
+            throw new Error('emit event failed: readonly')
         const name = <string> this.wai.peek(args[0], ABI_DATA_TYPE.string)
         const encoded = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
         let abi = this.world.abiCache.get(bin2hex(this.ctx.contractAddress))
@@ -101,8 +103,12 @@ export class DBHost extends AbstractHost {
 
     execute(args: bigint[]): bigint {
         let t = Number(args[0])
+        if((t === DBType.SET || t === DBType.REMOVE) && this.ctx.readonly)
+            throw new Error('modify db failed: readonly')
         switch (t) {
             case DBType.SET: {
+                if(this.ctx.readonly)
+                    throw new Error('emit event failed: readonly')
                 let addr = bin2hex(this.ctx.contractAddress)
                 let k = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
                 let val = <ArrayBuffer> this.wai.peek(args[2], ABI_DATA_TYPE.bytes)
@@ -160,6 +166,13 @@ export class ContextHost extends AbstractHost {
 
     execute(args: bigint[]): bigint{
         let type = Number(args[0])
+        const readonlyTypes = [
+            ContextType.CONTRACT_ADDRESS, ContextType.CONTRACT_NONCE, 
+            ContextType.ACCOUNT_NONCE, ContextType.ACCOUNT_BALANCE,
+            ContextType.CONTRACT_CODE, ContextType.CONTRACT_ABI
+        ]
+        if(this.ctx.readonly && readonlyTypes.indexOf(type) < 0)
+            throw new Error(`${ContextType[type]} is not available in view`)
 
         switch (type) {
             case ContextType.HEADER_PARENT_HASH: {
@@ -259,6 +272,8 @@ export class Transfer extends AbstractHost{
     }
 
     execute(args: bigint[]): void {
+        if(this.ctx.readonly)
+            throw new Error('transfer is not availalbe here')
         if(!isZero(args[0]))
             throw new Error('transfer: unexpected')
         let amount = <bigint> this.wai.peek(args[2], ABI_DATA_TYPE.u256)

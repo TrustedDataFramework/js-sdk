@@ -386,15 +386,33 @@ export class VirtualMachine {
         this.increaseNonce(sender)
         const ctx = this.optionsToContext(opts, sender, addr, amount)
         ctx.type = TransactionType.CONTRACT_CALL
-        const ret = await this.callInternal(method, ctx, params, opts)
+        const ret = await this.callInternal(method, ctx, params)
         this.nextBlock()
         return ret
     }
 
-    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>, opts?: TransactionOptions): Promise<TransactionResult> {
+
+    /**
+     * 查看合约
+     * @param addr 
+     * @param method 
+     * @param params 
+     */
+    async view(addr: Binary, method: string, params: AbiInput | AbiInput[] | Record<string, AbiInput> = []): Promise<Readable> {
+        const ctx = <CallContext> {
+            readonly: true,
+            contractAddress: hex2bin(addr).buffer
+        }
+        const ret = await this.callInternal(method, ctx, params)
+        return ret.result
+    }
+
+    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<TransactionResult> {
         // 1. substract amount
-        this.subBalance(ctx.sender, ctx.amount)
-        this.addBalance(ctx.contractAddress, ctx.amount)
+        if(!ctx.readonly){
+            this.subBalance(ctx.sender, ctx.amount)
+            this.addBalance(ctx.contractAddress, ctx.amount)
+        }
         ctx.type = method === 'init' ? TransactionType.CONTRACT_DEPLOY : TransactionType.CONTRACT_CALL
         const file = this.contractCode.get(bin2hex(ctx.contractAddress))
         const abi = await this.fetchABI(file)
@@ -443,8 +461,9 @@ export class VirtualMachine {
         }
         let ret = instance.exports[method].apply(window, args)
 
+        const txHash = ctx.readonly ? null : bin2hex(ctx.txHash)
         const r: TransactionResult = {
-            transactionHash: bin2hex(ctx.txHash),
+            transactionHash: txHash,
             blockHeight: this.height,
             blockHash: bin2hex(this.hash),
             gasUsed: 0,

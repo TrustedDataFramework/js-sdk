@@ -1,6 +1,6 @@
 export { __change_t, __malloc, __peek} from '../lib/prelude'
 
-import {DB, Util, log} from '../lib'
+import { DB, Util } from '../lib'
 
 export function init(): void{
     const k = Util.str2bin('key')
