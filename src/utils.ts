@@ -494,11 +494,10 @@ export function uuidv4() {
  * @param tx  事务
  * @param sk 私钥
  */
-export function sign(tx: Record<string, AbiInput>, sk: Binary): Object {
+export function sign(tx: Record<string, AbiInput>, sk: Binary): Transaction {
     const t = Transaction.clone(tx)
     t.sign(sk)
-    tx.signature = t.signature
-    return tx
+    return t
 }
 
 /**
