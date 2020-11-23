@@ -6,6 +6,7 @@ import { ContextHost, DBHost, EventHost, Log, Reflect, Transfer, AbstractHost } 
 import * as rlp from './rlp'
 import { ABI_DATA_TYPE } from "./constants"
 import { sm3 } from '@salaku/sm-crypto'
+import { TransactionResult } from "./rpc"
 
 const utf8Decoder = new TextDecoder()
 const utf8Encoder = new TextEncoder()
@@ -95,6 +96,8 @@ export interface CallContext {
      * 当前调用的链上数据是否处于只读状态
      */
     readonly: boolean
+
+    events: { name: string, data: any }[]
 }
 
 
@@ -364,7 +367,8 @@ export class VirtualMachine {
             contractAddress: contractAddrBin,
             readonly: false,
             txAmount: toBigN(amount),
-            to: hex2bin(opts.to || (deploy ? '' : contractAddrBin)).buffer
+            to: hex2bin(opts.to || (deploy ? '' : contractAddrBin)).buffer,
+            events: []
         }
     }
 
@@ -378,7 +382,7 @@ export class VirtualMachine {
      * @param amount 事务的 amount
      * @param opts
      */
-    async call(sender: Binary, addr: Binary, method: string, params: AbiInput | AbiInput[] | Record<string, AbiInput> = [], amount: Digital = 0, opts: TransactionOptions = {}): Promise<Readable> {
+    async call(sender: Binary, addr: Binary, method: string, params: AbiInput | AbiInput[] | Record<string, AbiInput> = [], amount: Digital = 0, opts: TransactionOptions = {}): Promise<TransactionResult> {
         this.increaseNonce(sender)
         const ctx = this.optionsToContext(opts, sender, addr, amount)
         ctx.type = TransactionType.CONTRACT_CALL
@@ -387,7 +391,7 @@ export class VirtualMachine {
         return ret
     }
 
-    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>, opts?: TransactionOptions): Promise<Readable> {
+    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>, opts?: TransactionOptions): Promise<TransactionResult> {
         // 1. substract amount
         this.subBalance(ctx.sender, ctx.amount)
         this.addBalance(ctx.contractAddress, ctx.amount)
@@ -438,9 +442,20 @@ export class VirtualMachine {
             args.push(wai.malloc(arr[i], t), t)
         }
         let ret = instance.exports[method].apply(window, args)
-        if (a.outputs && a.outputs.length)
-            return this.extractRet(instance, ret, ABI_DATA_TYPE[a.outputs[0].type])
 
+        const r: TransactionResult = {
+            transactionHash: bin2hex(ctx.txHash),
+            blockHeight: this.height,
+            blockHash: bin2hex(this.hash),
+            gasUsed: 0,
+            events: ctx.events,
+            fee: 0,
+            method: method
+        }
+
+        if (a.outputs && a.outputs.length)
+            r.result = this.extractRet(instance, ret, ABI_DATA_TYPE[a.outputs[0].type])
+        return r
     }
 
     extractRet(ins: VMInstance, offset: number | bigint, type: ABI_DATA_TYPE): Readable {
@@ -483,7 +498,7 @@ export class VirtualMachine {
 
 
     // 合约部署
-    async deploy(sender: Binary, wasmFile: string, parameters: AbiInput | AbiInput[] | Record<string, AbiInput> = [], amount: Digital = 0, opts: TransactionOptions = {}): Promise<Readable> {
+    async deploy(sender: Binary, wasmFile: string, parameters: AbiInput | AbiInput[] | Record<string, AbiInput> = [], amount: Digital = 0, opts: TransactionOptions = {}): Promise<TransactionResult> {
         let senderAddress = normalizeAddress(sender)
         const n = this.increaseNonce(sender)
         const contractAddress = getContractAddress(senderAddress, n)

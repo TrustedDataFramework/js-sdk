@@ -8,11 +8,11 @@ import rlp = require('./rlp')
  * 事务构造工具
  */
 export class TransactionBuilder {
-    version: number
+    version: Digital
     sk: string
-    gasLimit: bigint | number
-    gasPrice: bigint | number
-    nonce: bigint | number
+    gasLimit: Digital
+    gasPrice: Digital
+    nonce: Digital
 
     constructor(
         version: Digital = constants.POA_VERSION,

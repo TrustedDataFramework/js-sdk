@@ -87,9 +87,7 @@ export class EventHost extends AbstractHost {
         const c = new Contract('', abi)
         let fields = <Uint8Array[]>rlp.decode(encoded)
         let o = c.abiDecode(name, fields, 'event')
-        console.log(`Event emit, name = ${name}`)
-        console.log(o)
-
+        this.ctx.events.push({name: name, data: o})
     }
     name(): string {
         return '_event'

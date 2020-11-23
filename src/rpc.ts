@@ -1,4 +1,4 @@
-import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeInt, uuidv4 } from "./utils"
+import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeDig, toSafeInt, uuidv4 } from "./utils"
 import rlp = require("./rlp")
 import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS, AbiEncoded} from "./constants"
 import { Contract, normalizeParams } from "./contract";
@@ -18,7 +18,7 @@ export interface TransactionResult {
     blockHeight?: number | bigint
     blockHash?: string
     gasUsed?: bigint | number
-    events?: Readable[] | Record<string, Readable>
+    events?: {name: string, data: any}[]
     result?: Readable
     fee?: bigint | number
     method?: string
@@ -606,7 +606,15 @@ export class RPC {
      */
     getTransaction(hash: string): Promise<Transaction> {
         const url = `http://${this.host}:${this.port}/rpc/transaction/${hash}`
-        return rpcGet(url).then(r => Transaction.clone(r))
+        return rpcGet(url).then(
+            (r: any) => {
+                const tx = Transaction.clone(r)
+                tx.blockHeight = r.blockHeight && toSafeDig(r.blockHeight)
+                tx.blockHash = r.blockHash
+                tx.confirms = r.confirms
+                return tx
+            }
+        )
     }
 
     /**

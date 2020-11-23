@@ -97,7 +97,7 @@ export class RLP {
                 return changetype<T>(new Address(RLP.decodeBytes(buf)))
         }
         assert(false, 'rlp encode failed, invalid type ' + nameof<T>())
-        return changetype<T>(null);
+        return changetype<T>(0)
     }
 
     // if the byte array was encoded from a list
@@ -212,7 +212,7 @@ export class RLPItem {
     }
 }
 
-function copyOfRange(arr: Uint8Array, offset: number, limit: number): ArrayBuffer {
+function copyOfRange(arr: Uint8Array, offset: i32, limit: i32): ArrayBuffer {
     let ret = new Uint8Array(limit - offset)
     ret.set(arr.slice(offset, limit))
     return ret.buffer
@@ -291,7 +291,7 @@ function validateSize(encoded: ArrayBuffer): void{
 }
 
 function isRLPList(encoded: ArrayBuffer): boolean{
-    return Uint8Array.wrap(encoded)[0] >= OFFSET_SHORT_LIST
+    return Uint8Array.wrap(encoded)[0] >= u8(OFFSET_SHORT_LIST)
 }
 
 function decodeElements(enc: ArrayBuffer): ArrayBuffer[] {
@@ -301,7 +301,7 @@ function decodeElements(enc: ArrayBuffer): ArrayBuffer[] {
     }
     const parser = new RLPParser(enc)
     parser.skip(parser.prefixLength())
-    const ret = []
+    const ret: ArrayBuffer[] = []
     while (parser.remained() > 0) {
         ret.push(parser.bytes(parser.peekSize()))
     }

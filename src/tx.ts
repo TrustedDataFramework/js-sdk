@@ -25,6 +25,11 @@ export class Transaction implements Encoder {
     payload: string
     to: string
     signature: string
+
+    blockHeight?: number | string
+    blockHash?: string
+    confirms?: number
+
     __abi?: ABI[]
     __inputs?: Readable[] | Record<string, Readable>
     constructor(version?: Digital, type?: Digital, createdAt?: Digital, nonce?: Digital, from?: Binary, gasLimit?: Digital, gasPrice?: Digital, amount?: Digital, payload?: Binary, to?: Binary, signature?: Binary, __abi?: ABI[], __inputs?: Readable[] | Record<string, Readable>) {
