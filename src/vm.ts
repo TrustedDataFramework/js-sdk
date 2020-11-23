@@ -595,6 +595,8 @@ export class VirtualMachine {
             return this.abiCache.get(f)
         const resp = await fetch(f)
         const buf = await resp.arrayBuffer()
-        return JSON.parse(bin2str(buf))
+        const ret = JSON.parse(bin2str(buf))
+        this.abiCache.set(f, ret)
+        return ret
     }
 }

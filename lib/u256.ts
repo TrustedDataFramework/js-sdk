@@ -3,7 +3,7 @@ import { Util } from "./util";
 export class U256{
     private static ONE: U256 | null = null
     public static ZERO: U256 = new U256(new Uint8Array(32).buffer)
-    private readonly buf: ArrayBuffer
+    readonly buf: ArrayBuffer
 
     @operator("+")
     static __op_add(left: U256, right: U256): U256 {

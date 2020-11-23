@@ -273,6 +273,7 @@ class RLPParser {
         assert(this.offset + n <= this.limit, 'read overflow')
         const ret = new Uint8Array(n)
         ret.set(this.buf.slice(this.offset, this.offset + n))
+        this.offset += n
         return ret.buffer
     }
 
