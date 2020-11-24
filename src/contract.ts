@@ -38,10 +38,12 @@ class MemoryOutputStream implements OutputStream {
  * @param opts 可选项
  */
 export async function compileContract(ascPath?: string, src?: string, opts?: { debug?: boolean, optimize?: boolean }): Promise<Uint8Array> {
+    let abortPath = path.relative(process.cwd(), path.join(__dirname, '../lib/prelude/abort'))
+    abortPath = abortPath.replace(/\\/g, '/')
     if (typeof ascPath === 'string' && typeof src === 'string') {
         const child_process = require('child_process')
         // --runtime none 可以取消垃圾回收
-        let cmd = ascPath + ' ' + src + ` -b --runtime none --use abort=${path.relative(process.cwd(), path.join(__dirname, '../lib/prelude/abort'))}` // 执行的命令
+        let cmd = ascPath + ' ' + src + ` -b --runtime none --use abort=${abortPath}` // 执行的命令
         if (opts && opts.debug)
             cmd += ' --debug '
         if (opts && opts.optimize)
@@ -74,7 +76,7 @@ export async function compileContract(ascPath?: string, src?: string, opts?: { d
         '--runtime',
         'none',
         '--use',
-        `abort=${path.relative(process.cwd(), path.join(__dirname, '../lib/prelude/abort'))}`
+        `abort=${abortPath}`
     ]
     const stdout = new MemoryOutputStream()
     const stderr = new MemoryOutputStream()
