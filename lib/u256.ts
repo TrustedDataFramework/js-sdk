@@ -12,11 +12,11 @@ export class U256 {
 
     @operator("+")
     static __op_add(left: U256, right: U256): U256 {
-        return left.safeAdd(right);
+        return left.safeAdd(right)
     }
     @operator("-")
     static __op_sub(left: U256, right: U256): U256 {
-        return left.safeSub(right);
+        return left.safeSub(right)
     }
 
     @operator("*")
@@ -34,37 +34,40 @@ export class U256 {
     @operator("%")
     static __op_mod(left: U256, right: U256): U256 {
         return left.divMod(right)[1]
-    }    
+    }
 
     @operator(">")
     static __op_gt(left: U256, right: U256): bool {
-        return left.compareTo(right) > 0;
+        return left.compareTo(right) > 0
     }
     @operator(">=")
     static __op_gte(left: U256, right: U256): bool {
-        return left.compareTo(right) >= 0;
+        return left.compareTo(right) >= 0
     }
     @operator("<")
     static __op_lt(left: U256, right: U256): bool {
-        return left.compareTo(right) < 0;
+        return left.compareTo(right) < 0
     }
     @operator("<=")
     static __op_lte(left: U256, right: U256): bool {
-        return left.compareTo(right) <= 0;
+        return left.compareTo(right) <= 0
     }
     @operator("==")
     static __op_eq(left: U256, right: U256): bool {
-        return left.compareTo(right) == 0;
+        return left.compareTo(right) == 0
     }
 
-
+    @operator("!=")
+    static __op_not_eq(left: U256, right: U256): bool {
+        return left.compareTo(right) != 0
+    }
 
     compareTo(u: U256): i32 {
         return Util.compareBytes(this.buf, u.buf)
     }
 
     static one(): U256 {
-        if (U256.ONE != null)
+        if (U256.ONE !== null)
             return changetype<U256>(U256.ONE)
 
         const buf = new Uint8Array(32)
@@ -78,7 +81,7 @@ export class U256 {
             return changetype<U256>(U256.ONE)
 
         const buf = new Uint8Array(32)
-        for(let i = 0; i < buf.length; i++){
+        for (let i = 0; i < buf.length; i++) {
             buf[i] = u8(0xff)
         }
         U256.MAX_VALUE = new U256(buf.buffer)
@@ -242,9 +245,9 @@ export class U256 {
         let ret = ''
         const BASE = U256.fromU64(10)
         let n = new U256(this.buf)
-        if(n == U256.ZERO)
+        if (n == U256.ZERO)
             return '0'
-        while(n > U256.ZERO){
+        while (n > U256.ZERO) {
             const dm = n.divMod(BASE)
             n = dm[0]
             let m = dm[1]
@@ -258,7 +261,7 @@ export class U256 {
         return Util.bytesToU64(arr)
     }
 
-    div(divisor: U256): U256{
+    div(divisor: U256): U256 {
         return this.divMod(divisor)[0]
     }
 
