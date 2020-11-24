@@ -1,4 +1,4 @@
-import { AbiInput, Binary, Digital } from './constants'
+import { AbiInput, Binary, Digital, OFFSET_DATE } from './constants'
 import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeDig } from "./utils";
 import { sm3, sm2 } from '@salaku/sm-crypto'
 import { constants, ABI_DATA_TYPE, Readable } from './constants'
@@ -6,8 +6,6 @@ import rlp = require('./rlp')
 import { Encoder } from "./rlp";
 import { ABI, Contract } from './contract'
 
-// 2020-10-25T09:57:15+08:00
-const OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/
 
 /**
  * 事务实体类，字段尽量用字符串表示，便于在 json 中序列化和反序列化

@@ -1,3 +1,5 @@
+import { Transaction } from "./tx"
+
 /**
  * 整数或者十进制、十六进制表示的整数字符串
  */
@@ -105,4 +107,23 @@ export const MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER)
 
 export const ONE = BigInt(1)
 export const ZERO = BigInt(0)
+
+export interface Header {
+    stateRoot: string,
+    version: number,
+    hash: string,
+    height: number,
+    payload: string,
+    createdAt: Date,
+    hashPrev: string,
+    transactionsRoot: string,
+    size: number
+}
+
+export interface Block extends Header{
+    body: Transaction[]
+}
+
+// 2020-10-25T09:57:15+08:00
+export const OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/
 

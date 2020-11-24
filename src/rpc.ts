@@ -1,6 +1,6 @@
 import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeDig, toSafeInt, uuidv4 } from "./utils"
 import rlp = require("./rlp")
-import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS, AbiEncoded} from "./constants"
+import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS, Block, OFFSET_DATE, Header} from "./constants"
 import { Contract, normalizeParams } from "./contract";
 import { Transaction } from "./tx";
 
@@ -584,9 +584,19 @@ export class RPC {
      * @param hashOrHeight {string | number} 区块哈希值或者区块高度
      * @returns {Promise<Object>}
      */
-    getHeader(hashOrHeight: string | number): Promise<Object> {
+    async getHeader(hashOrHeight: string | number): Promise<Header> {
         const url = `http://${this.host}:${this.port}/rpc/header/${hashOrHeight}`
-        return rpcGet(url)
+        let data = await rpcGet(url)
+        data = this.mapBlock(data)
+        delete data['body']
+        return <Header> data
+    }
+
+    mapBlock(data: any): Block{
+        data.createdAt = typeof (<any>data.createdAt) === 'string' && OFFSET_DATE.test((<any>data.createdAt)) ?
+            new Date((<any>data.createdAt)) : new Date((<any>data.createdAt) * 1000)
+        data.body = (<any[]> data.body || []).map(t => Transaction.clone(t))
+        return data
     }
 
     /**
@@ -594,9 +604,10 @@ export class RPC {
      * @param hashOrHeight {string | number} 区块哈希值或者区块高度
      * @returns {Promise<Object>}
      */
-    getBlock(hashOrHeight: string | number): Promise<Object> {
+    async getBlock(hashOrHeight: string | number): Promise<Block> {
         const url = `http://${this.host}:${this.port}/rpc/block/${hashOrHeight}`
-        return rpcGet(url)
+        const data: Block = <Block> (await rpcGet(url))
+        return this.mapBlock(data)
     }
 
     /**
