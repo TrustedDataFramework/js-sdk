@@ -438,7 +438,7 @@ export class RPC {
     /**
      * 查看合约方法
      */
-    viewContract(contract: Contract, method: string, parameters): Promise<Readable | Readable[] | Record<string, Readable>> {
+    viewContract(contract: Contract, method: string, parameters?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<Readable | Readable[] | Record<string, Readable>> {
         parameters = normalizeParams(parameters)
         const addr = contract.address
         const params = contract.abiEncode(method, parameters)

@@ -165,6 +165,8 @@ export function hex2bin(s: string | ArrayBuffer | Uint8Array): Uint8Array {
         return s
     if (s.startsWith('0x'))
         s = s.substr(2, s.length - 2)
+    if(typeof Buffer === 'function' && typeof s === 'string')
+        return Buffer.from(s, 'hex')   
     assert(s.length % 2 === 0, 'invalid char');
     const ret = new Uint8Array(s.length / 2);
     for (let i = 0; i < s.length / 2; i++) {

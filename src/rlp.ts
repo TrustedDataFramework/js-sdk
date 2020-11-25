@@ -48,21 +48,7 @@ export function byteArrayToInt(bytes: ArrayBuffer | Uint8Array): number {
  * @returns {Uint8Array}
  */
 export function numberToByteArray(u: number): Uint8Array {
-    if (u < 0 || !Number.isInteger(u))
-        throw new Error(`cannot convert number ${u} to byte array`)
-    const buf = new Uint8Array(8);
-    for (let i = 0; i < 8; i++) {
-        buf[buf.length - 1 - i] = u & 0xff;
-        u = u >>> 8;
-    }
-    let k = 8;
-    for (let i = 0; i < 8; i++) {
-        if (buf[i] !== 0) {
-            k = i;
-            break;
-        }
-    }
-    return buf.slice(k, buf.length);
+    return encodeBE(u)
 }
 
 
