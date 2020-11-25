@@ -1,4 +1,4 @@
-import { Digital, ONE, constants, Binary, AbiInput } from './constants'
+import {Digital, ONE, constants, Binary, AbiInput, ZERO} from './constants'
 import { Transaction } from './tx'
 import { bin2hex, dig2str, privateKey2PublicKey, assert, toSafeInt, toBigN } from './utils'
 import { Contract, normalizeParams } from './contract'
@@ -114,7 +114,7 @@ export class TransactionBuilder {
             to
         )
 
-        if (this.nonce && this.nonce > 0) {
+        if (this.nonce && this.nonce > ZERO) {
             ret.nonce = dig2str(this.nonce)
             this.increaseNonce()
             this.sign(ret)

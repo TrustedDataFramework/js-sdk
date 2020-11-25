@@ -1,5 +1,5 @@
 import { normalizeAddress, bin2hex, bin2str, hex2bin, encodeBE, toSafeInt, decodeBE, toBigN, convert } from "./utils"
-import { ABI, getContractAddress, normalizeParams } from "./contract"
+import { ABI, getContractAddress, normalizeParams, compileABI } from "./contract"
 import { Binary, AbiInput, Digital, ZERO, Readable, constants } from "./constants"
 import { ContextHost, DBHost, EventHost, Log, Reflect, Transfer, AbstractHost } from './hosts'
 
@@ -293,13 +293,13 @@ export class VirtualMachine {
 
     hosts: Map<string, Function> = new Map()
 
-    map2Array<V>(m: Map<string, V>): [Uint8Array, V][]{
+    map2Array<V>(m: Map<string, V>): [Uint8Array, V][] {
         const ret = []
         m.forEach((v, k) => ret.push([hex2bin(k), v]))
         return ret
     }
 
-    dump(): ArrayBuffer{
+    dump(): ArrayBuffer {
         const storageArray = this.map2Array(this.storage)
         const enc: [Uint8Array, [Uint8Array, ArrayBuffer][]][] = storageArray.map(x => [x[0], this.map2Array(x[1])])
         const arr = [
@@ -310,11 +310,11 @@ export class VirtualMachine {
         return rlp.encode(arr)
     }
 
-    static fromDump(dumped: ArrayBuffer | Uint8Array): VirtualMachine{
+    static fromDump(dumped: ArrayBuffer | Uint8Array): VirtualMachine {
         const decoded = rlp.decode(dumped)
         const vm = new VirtualMachine()
-        vm.height = rlp.byteArrayToInt(<Uint8Array> decoded[0])
-        vm.parentHash = (<Uint8Array> decoded[1]).buffer
+        vm.height = rlp.byteArrayToInt(<Uint8Array>decoded[0])
+        vm.parentHash = (<Uint8Array>decoded[1]).buffer
         vm.hash = (decoded[2] as Uint8Array).buffer;
         (decoded[3] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
             vm.contractCode.set(bin2hex(arr[0]), bin2str(arr[1]))
@@ -322,23 +322,23 @@ export class VirtualMachine {
 
         (decoded[4] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
             vm.nonceMap.set(bin2hex(arr[0]), rlp.byteArrayToInt(arr[1]))
-        });    
+        });
 
         (decoded[5] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
             vm.balanceMap.set(bin2hex(arr[0]), toBigN(arr[1]))
         });
 
-        vm.now = rlp.byteArrayToInt(<Uint8Array> decoded[6]);
-        
+        vm.now = rlp.byteArrayToInt(<Uint8Array>decoded[6]);
+
         (decoded[7] as any[]).forEach((arr: [Uint8Array, [Uint8Array, Uint8Array][]]) => {
             const k = bin2hex(arr[0])
-            if(!vm.storage.has(k)) 
+            if (!vm.storage.has(k))
                 vm.storage.set(k, new Map())
             const m: Map<string, ArrayBuffer> = vm.storage.get(k);
             (arr[1]).forEach((kv) => {
                 m.set(bin2hex(kv[0]), kv[1].buffer)
-            })    
-        })      
+            })
+        })
 
         return vm
     }
@@ -449,7 +449,7 @@ export class VirtualMachine {
      * @param params 
      */
     async view(addr: Binary, method: string, params: AbiInput | AbiInput[] | Record<string, AbiInput> = []): Promise<Readable> {
-        const ctx = <CallContext> {
+        const ctx = <CallContext>{
             readonly: true,
             contractAddress: hex2bin(addr).buffer
         }
@@ -457,9 +457,19 @@ export class VirtualMachine {
         return ret.result
     }
 
+    private async createInstance(file: string, env: any): Promise<VMInstance>{
+        if (typeof WebAssembly.instantiateStreaming === 'function' && typeof fetch === 'function') {
+            return <VMInstance>(await WebAssembly.instantiateStreaming(fetch(file), {
+                env: env
+            })).instance
+        }
+        const fs = require('fs')
+        return <VMInstance> (await WebAssembly.instantiate(fs.readFileSync(file), {env: env})).instance
+    }
+
     private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<TransactionResult> {
         // 1. substract amount
-        if(!ctx.readonly){
+        if (!ctx.readonly) {
             this.subBalance(ctx.sender, ctx.amount)
             this.addBalance(ctx.contractAddress, ctx.amount)
         }
@@ -489,9 +499,7 @@ export class VirtualMachine {
             env[k] = v
         })
 
-        let instance = <VMInstance>(await WebAssembly.instantiateStreaming(fetch(file), {
-            env: env
-        })).instance
+        let instance = await this.createInstance(file, env)
 
         hosts.forEach(h => {
             h.setIns(instance)
@@ -509,7 +517,7 @@ export class VirtualMachine {
             const t = ABI_DATA_TYPE[a.inputs[i].type]
             args.push(wai.malloc(arr[i], t))
         }
-        let ret = instance.exports[method].apply(window, args)
+        let ret = instance.exports[method].apply(instance.exports, args)
 
         const txHash = ctx.readonly ? null : bin2hex(ctx.txHash)
         const r: TransactionResult = {
@@ -593,9 +601,17 @@ export class VirtualMachine {
         let f = wasmFile.replace(/^(.*)\.wasm$/, '$1.abi.json')
         if (this.abiCache.has(f))
             return this.abiCache.get(f)
-        const resp = await fetch(f)
-        const buf = await resp.arrayBuffer()
-        const ret = JSON.parse(bin2str(buf))
+
+        if (typeof fetch === 'function') {
+            const resp = await fetch(f)
+            const buf = await resp.arrayBuffer()
+            const ret = JSON.parse(bin2str(buf))
+            this.abiCache.set(f, ret)
+            return ret
+        }
+
+        const fs = require('fs')
+        const ret = JSON.parse(fs.readFileSync(f, 'utf-8'))
         this.abiCache.set(f, ret)
         return ret
     }

@@ -143,7 +143,7 @@ export class Address {
         )
 
         if (!isVoid<T>()) {
-            return changetype<T>(r)
+            return changetype<T>(usize(r))
         }
     }
 
@@ -348,7 +348,7 @@ export class Context {
             ReflectType.CREATE, changetype<usize>(code),
             changetype<usize>('init'), changetype<usize>(buf),
             changetype<usize>(amount), changetype<usize>(abi)
-        );
-        return changetype<Address>(r)
+        )
+        return changetype<Address>(usize(r))
     }
 }

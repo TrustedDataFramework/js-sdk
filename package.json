@@ -15,6 +15,7 @@
     "sdk",
     "js"
   ],
+  "ascMain": "lib/index.ts",
   "license": "MIT",
   "dependencies": {
     "@salaku/sm-crypto": "^0.3.4",

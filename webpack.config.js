@@ -20,7 +20,8 @@ module.exports = (env = {}) => ({
       buffer: false,
       http: false,
       url: false,
-      path: false
+      path: false,
+      fs: false
     },
   },
   module: {
