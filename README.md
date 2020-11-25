@@ -100,9 +100,8 @@ console.log(tdsSDK.getContractAddress(addr, nonce))
 
 ```js
 const tdsSDK = require('@salaku/js-sdk')
-const ascPath = 'node_modules/.bin/asc'
 const src = 'index.ts'
-tdsSDK.compileContract(ascPath, src)
+tdsSDK.compileContract(src)
     .then(buf => console.log('buf length ' + buf.length))
 ```
 
@@ -298,7 +297,8 @@ const tx = builder.buildCancelVote('c2458cad4c838b81b49500d9268b352b03cd1b78423c
  * erc 20 example in assembly script
  */
 
-import { Util, U256, Globals, ABI_DATA_TYPE, ___idof} from './node_modules/@salaku/js-sdk/lib'
+export { __change_t, __malloc, __peek } from './node_modules/@salaku/js-sdk/lib' // 区块链应用程序接口
+import { Util, U256, Globals, ABI_DATA_TYPE } from './node_modules/@salaku/js-sdk/lib'
 import { Store } from './node_modules/@salaku/js-sdk/lib'
 import { Context, Address } from './node_modules/@salaku/js-sdk/lib'
 
