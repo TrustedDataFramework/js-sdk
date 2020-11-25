@@ -114,7 +114,7 @@ export class TransactionBuilder {
             to
         )
 
-        if (this.nonce && this.nonce > ZERO) {
+        if (this.nonce && this.nonce > ZERO && this.sk) {
             ret.nonce = dig2str(this.nonce)
             this.increaseNonce()
             this.sign(ret)
