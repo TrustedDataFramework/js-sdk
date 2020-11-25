@@ -3,11 +3,7 @@ import { Util } from "./util"
 const chars = '0123456789'
 
 export class U256 {
-    private static ONE: U256 | null = null
     public static ZERO: U256 = new U256(new Uint8Array(32).buffer)
-
-    private static MAX_VALUE: U256 | null = null
-
     readonly buf: ArrayBuffer
 
     @operator("+")
@@ -67,25 +63,17 @@ export class U256 {
     }
 
     static one(): U256 {
-        if (U256.ONE !== null)
-            return changetype<U256>(U256.ONE)
-
         const buf = new Uint8Array(32)
         buf[31] = 1
-        U256.ONE = new U256(buf.buffer)
-        return changetype<U256>(U256.ONE)
+        return new U256(buf.buffer)
     }
 
     static max(): U256 {
-        if (U256.MAX_VALUE != null)
-            return changetype<U256>(U256.ONE)
-
         const buf = new Uint8Array(32)
         for (let i = 0; i < buf.length; i++) {
             buf[i] = u8(0xff)
         }
-        U256.MAX_VALUE = new U256(buf.buffer)
-        return changetype<U256>(U256.MAX_VALUE)
+        return new U256(buf.buffer)
     }
 
     constructor(buf: ArrayBuffer) {

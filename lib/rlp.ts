@@ -102,8 +102,8 @@ export class RLP {
 
     // if the byte array was encoded from a list
     static isList(encoded: ArrayBuffer): bool {
-        const arr = Uint8Array.wrap(encoded);
-        return arr[0] >= OFFSET_SHORT_LIST;
+        const arr = Uint8Array.wrap(encoded)
+        return arr[0] >= u8(OFFSET_SHORT_LIST)
     }
 
     static encodeU64(u: u64): ArrayBuffer {

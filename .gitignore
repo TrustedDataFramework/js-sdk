@@ -9,3 +9,4 @@ local
 dist/*
 !dist/bn.d.ts
 !dist/bn.js
+*.wasm
