@@ -106,7 +106,7 @@ export class TransactionBuilder {
             type,
             Math.floor((new Date()).valueOf() / 1000),
             0,
-            privateKey2PublicKey(this.sk),
+            this.sk && privateKey2PublicKey(this.sk) || '',
             this.gasLimit,
             this.gasPrice,
             amount || 0,
