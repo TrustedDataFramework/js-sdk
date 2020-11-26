@@ -21,7 +21,8 @@ module.exports = (env = {}) => ({
       http: false,
       url: false,
       path: false,
-      fs: false
+      fs: false,
+      worker_threads: false
     },
   },
   module: {

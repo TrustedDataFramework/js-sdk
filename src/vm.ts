@@ -467,15 +467,32 @@ export class VirtualMachine {
         return <VMInstance> (await WebAssembly.instantiate(fs.readFileSync(file), {env: env})).instance
     }
 
-    private async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<TransactionResult> {
+    async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<TransactionResult> {
         // 1. substract amount
         if (!ctx.readonly) {
             this.subBalance(ctx.sender, ctx.amount)
             this.addBalance(ctx.contractAddress, ctx.amount)
         }
+
+        const txHash = ctx.readonly ? null : bin2hex(ctx.txHash)
+
+        const r: TransactionResult = {
+            transactionHash: txHash,
+            blockHeight: this.height,
+            blockHash: bin2hex(this.hash),
+            gasUsed: 0,
+            events: ctx.events,
+            fee: 0,
+            method: method
+        }
+
         ctx.type = method === 'init' ? TransactionType.CONTRACT_DEPLOY : TransactionType.CONTRACT_CALL
         const file = this.contractCode.get(bin2hex(ctx.contractAddress))
         const abi = await this.fetchABI(file)
+
+        const a = abi.filter(x => x.type === 'function' && x.name === method)[0]
+        if(method === 'init' && !a)
+            return r
 
         let mem = new WebAssembly.Memory({ initial: 10, maximum: 65535 })
         const env = {
@@ -485,7 +502,7 @@ export class VirtualMachine {
 
         const hosts: AbstractHost[] = [
             new Log(this), new EventHost(this, ctx), new DBHost(this, ctx),
-            new ContextHost(this, ctx), new Reflect(this),
+            new ContextHost(this, ctx), new Reflect(this, ctx),
             new Transfer(this, ctx)
         ]
 
@@ -510,7 +527,7 @@ export class VirtualMachine {
         }
 
         const wai = new WasmInterface(instance)
-        const a = abi.filter(x => x.type === 'function' && x.name === method)[0]
+
         const arr = this.normParams(a, params)
         const args = []
         for (let i = 0; i < a.inputs.length; i++) {
@@ -519,16 +536,7 @@ export class VirtualMachine {
         }
         let ret = instance.exports[method].apply(instance.exports, args)
 
-        const txHash = ctx.readonly ? null : bin2hex(ctx.txHash)
-        const r: TransactionResult = {
-            transactionHash: txHash,
-            blockHeight: this.height,
-            blockHash: bin2hex(this.hash),
-            gasUsed: 0,
-            events: ctx.events,
-            fee: 0,
-            method: method
-        }
+
 
         if (a.outputs && a.outputs.length)
             r.result = this.extractRet(instance, ret, ABI_DATA_TYPE[a.outputs[0].type])
@@ -587,11 +595,7 @@ export class VirtualMachine {
 
         const a = abi.filter(x => x.type === 'function' && x.name === 'init')[0]
 
-        let ret
-        // try to execute init function
-        if (a) {
-            ret = await this.callInternal('init', ctx, parameters)
-        }
+        let ret = await this.callInternal('init', ctx, parameters)
         this.nextBlock()
         return ret
     }

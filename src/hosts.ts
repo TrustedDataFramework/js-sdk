@@ -1,10 +1,12 @@
-import {isZero, VirtualMachine, VMInstance, WasmInterface} from './vm'
-import {bin2hex, str2bin} from './utils'
-import {Contract} from './contract'
+import {CallContext, isZero, VirtualMachine, VMInstance, WasmInterface} from './vm'
+import {bin2hex, bin2str, hex2bin, str2bin} from './utils'
+import {abiDecode, Contract, getContractAddress, TypeDef} from './contract'
 import * as rlp from './rlp'
-import {ABI_DATA_TYPE, ZERO} from './constants'
-import { CallContext } from './vm'
+import {ABI_DATA_TYPE, Readable, WorkerData, ZERO} from './constants'
+import {Worker} from 'worker_threads'
+import path = require('path');
 
+const BUFFER_SIZE = 64 * 1024 // 64 KB, for value returns
 
 export abstract class AbstractHost {
     wai: WasmInterface
@@ -20,7 +22,7 @@ export abstract class AbstractHost {
     }
 
     // after initialize
-    setIns(ins: VMInstance): void{
+    setIns(ins: VMInstance): void {
         this.wai = new WasmInterface(ins)
     }
 
@@ -35,10 +37,10 @@ export class Log extends AbstractHost {
     }
 
     execute(args: (number | bigint)[]): void {
-        if(this.wai === undefined){
+        if (this.wai === undefined) {
             console.log('undefined')
         }
-        let s = <string> this.wai.peek(args[0], ABI_DATA_TYPE.string)
+        let s = <string>this.wai.peek(args[0], ABI_DATA_TYPE.string)
         console.log(s)
     }
 }
@@ -81,15 +83,15 @@ export class EventHost extends AbstractHost {
     }
 
     execute(args: bigint[]): void {
-        if(this.ctx.readonly)
+        if (this.ctx.readonly)
             throw new Error('emit event failed: readonly')
-        const name = <string> this.wai.peek(args[0], ABI_DATA_TYPE.string)
-        const encoded = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
+        const name = <string>this.wai.peek(args[0], ABI_DATA_TYPE.string)
+        const encoded = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
         let abi = this.world.abiCache.get(bin2hex(this.ctx.contractAddress))
         const c = new Contract('', abi)
         let fields = <Uint8Array[]>rlp.decode(encoded)
         let o = c.abiDecode(name, fields, 'event')
-        this.ctx.events.push({name: name, data: o})
+        this.ctx.events.push({ name: name, data: o })
     }
     name(): string {
         return '_event'
@@ -103,15 +105,15 @@ export class DBHost extends AbstractHost {
 
     execute(args: bigint[]): bigint {
         let t = Number(args[0])
-        if((t === DBType.SET || t === DBType.REMOVE) && this.ctx.readonly)
+        if ((t === DBType.SET || t === DBType.REMOVE) && this.ctx.readonly)
             throw new Error('modify db failed: readonly')
         switch (t) {
             case DBType.SET: {
-                if(this.ctx.readonly)
+                if (this.ctx.readonly)
                     throw new Error('emit event failed: readonly')
                 let addr = bin2hex(this.ctx.contractAddress)
-                let k = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
-                let val = <ArrayBuffer> this.wai.peek(args[2], ABI_DATA_TYPE.bytes)
+                let k = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
+                let val = <ArrayBuffer>this.wai.peek(args[2], ABI_DATA_TYPE.bytes)
                 let m = this.world.storage.get(addr) || new Map<string, ArrayBuffer>()
                 m.set(bin2hex(k), val)
                 this.world.storage.set(addr, m)
@@ -119,7 +121,7 @@ export class DBHost extends AbstractHost {
             }
             case DBType.GET: {
                 let addr = bin2hex(this.ctx.contractAddress)
-                let k = bin2hex(<ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes))
+                let k = bin2hex(<ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.bytes))
                 let m = this.world.storage.get(addr) || new Map<string, ArrayBuffer>()
                 if (!m.has(k))
                     throw new Error(`key ${k} not found in db`)
@@ -129,14 +131,14 @@ export class DBHost extends AbstractHost {
             }
             case DBType.HAS: {
                 let addr = bin2hex(this.ctx.contractAddress)
-                let k = bin2hex(<ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes))
+                let k = bin2hex(<ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.bytes))
                 let m = this.world.storage.get(addr) || new Map<string, ArrayBuffer>()
                 return m.has(k) ? BigInt(1) : BigInt(0)
             }
             case DBType.REMOVE: {
                 let addr = bin2hex(this.ctx.contractAddress)
-                let k = bin2hex(<ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes))
-                const m = this.world.storage.get(addr) 
+                let k = bin2hex(<ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.bytes))
+                const m = this.world.storage.get(addr)
                 m && m.delete(k)
                 return BigInt(0)
             }
@@ -164,14 +166,14 @@ export class ContextHost extends AbstractHost {
         this.ctx = ctx
     }
 
-    execute(args: bigint[]): bigint{
+    execute(args: bigint[]): bigint {
         let type = Number(args[0])
         const readonlyTypes = [
-            ContextType.CONTRACT_ADDRESS, ContextType.CONTRACT_NONCE, 
+            ContextType.CONTRACT_ADDRESS, ContextType.CONTRACT_NONCE,
             ContextType.ACCOUNT_NONCE, ContextType.ACCOUNT_BALANCE,
             ContextType.CONTRACT_CODE, ContextType.CONTRACT_ABI
         ]
-        if(this.ctx.readonly && readonlyTypes.indexOf(type) < 0)
+        if (this.ctx.readonly && readonlyTypes.indexOf(type) < 0)
             throw new Error(`${ContextType[type]} is not available in view`)
 
         switch (type) {
@@ -187,7 +189,7 @@ export class ContextHost extends AbstractHost {
             case ContextType.TX_TYPE: {
                 return BigInt(this.ctx.type)
             }
-            case ContextType.TX_NONCE:{
+            case ContextType.TX_NONCE: {
                 return BigInt(this.ctx.nonce)
             }
             case ContextType.TX_CREATED_AT: {
@@ -218,11 +220,11 @@ export class ContextHost extends AbstractHost {
                 return BigInt(this.world.nonceMap.get(bin2hex(this.ctx.contractAddress)) || 0)
             }
             case ContextType.ACCOUNT_NONCE: {
-                let addr = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
+                let addr = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
                 return BigInt(this.world.nonceMap.get(bin2hex(addr)) || 0)
             }
             case ContextType.ACCOUNT_BALANCE: {
-                let addr = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
+                let addr = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
                 let b: bigint = this.world.balanceMap.get(bin2hex(addr)) || ZERO
                 return BigInt(this.wai.malloc(b, ABI_DATA_TYPE.u256))
             }
@@ -233,7 +235,7 @@ export class ContextHost extends AbstractHost {
                 return BigInt(this.wai.malloc(this.ctx.amount || ZERO, ABI_DATA_TYPE.u256))
             }
             case ContextType.CONTRACT_CODE: {
-                let addr = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
+                let addr = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
                 let code = this.world.contractCode.get(bin2hex(addr))
                 return BigInt(this.wai.malloc(str2bin(code), ABI_DATA_TYPE.bytes))
             }
@@ -252,17 +254,96 @@ export class ContextHost extends AbstractHost {
     }
 }
 
+enum ReflectType {
+    CALL, // call without put into memory
+    CREATE
+}
 
-export class Reflect extends AbstractHost{
+export class Reflect extends AbstractHost {
+    ctx: CallContext
+
+    constructor(world: VirtualMachine, ctx: CallContext) {
+        super(world)
+        this.ctx = ctx
+    }
+
     execute(args: (number | bigint)[]): number | bigint | void {
-        throw new Error('Method not implemented.')
+        const ctx = {
+            ...this.ctx
+        }
+        ctx.sender = ctx.contractAddress
+        ctx.amount = <bigint>this.wai.peek(args[4], ABI_DATA_TYPE.u256)
+        const t = Number(args[0])
+        if(t === ReflectType.CALL){
+            ctx.contractAddress = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
+        }else{
+            const buf = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.bytes)
+            console.log(buf.byteLength)
+            const code = bin2str(buf)
+
+            let n = this.world.increaseNonce(ctx.sender)
+            ctx.contractAddress = hex2bin(getContractAddress(ctx.sender, n))
+            this.world.contractCode.set(bin2hex(ctx.contractAddress), code)
+        }
+
+
+
+        const m = t === ReflectType.CALL ? <string>this.wai.peek(args[2], ABI_DATA_TYPE.string) : 'init'
+
+        const encoded = <ArrayBuffer>this.wai.peek(args[3], ABI_DATA_TYPE.bytes)
+        const params = rlp.decode(encoded)
+        const decoded: Uint8Array[] = <Uint8Array[]>(params[1])
+        const outputs: TypeDef[] =
+            (<Uint8Array[]>params[0]).map(x => rlp.byteArrayToInt(x))
+                .map(x => ({ type: ABI_DATA_TYPE[x] }))
+
+
+
+        const lock = new Int32Array(new SharedArrayBuffer(4))
+
+        const buf = new SharedArrayBuffer(BUFFER_SIZE)
+
+        const d: WorkerData = {
+            lock: lock,
+            dumped: this.world.dump(),
+            method: m,
+            params: <Readable[]>abiDecode(outputs, decoded),
+            buf: buf,
+            ctx: ctx,
+            ret: (<Uint8Array[]>params[2]).map(rlp.byteArrayToInt)
+        }
+
+        const wk = new Worker(path.join(__dirname, 'worker.js'), {
+            workerData: d
+        })
+
+        wk.on('error', console.error)
+
+        Atomics.wait(lock, 0, 0)
+        const u8 = new Uint8Array(buf)
+        const wdLen = rlp.byteArrayToInt(u8.slice(0, 4))
+        const machine = VirtualMachine.fromDump(u8.slice(4, 4 + wdLen))
+
+        for (let f of ['height', 'parentHash', 'hash', 'contractCode', 'nonceMap', 'balanceMap', 'now', 'storage']) {
+            this.world[f] = machine[f]
+        }
+        if(t === ReflectType.CREATE){
+            return BigInt(this.wai.malloc(ctx.contractAddress, ABI_DATA_TYPE.address))
+        }
+        if (d.ret.length == 0)
+            return BigInt(0)
+        const retLen = rlp.byteArrayToInt(u8.slice(4 + wdLen, 4 + wdLen + 4))
+        const ret: Uint8Array[] = <Uint8Array[]> rlp.decode(u8.slice(4 + wdLen + 4, 4 + wdLen + 4 + retLen))
+        const retType: ABI_DATA_TYPE = d.ret[0]
+        const r = abiDecode([{ type: ABI_DATA_TYPE[retType] }], ret)[0]
+        return BigInt(this.wai.malloc(r, retType))
     }
     name(): string {
         return '_reflect'
     }
 }
 
-export class Transfer extends AbstractHost{
+export class Transfer extends AbstractHost {
     ctx: CallContext
 
 
@@ -272,12 +353,12 @@ export class Transfer extends AbstractHost{
     }
 
     execute(args: bigint[]): void {
-        if(this.ctx.readonly)
+        if (this.ctx.readonly)
             throw new Error('transfer is not availalbe here')
-        if(!isZero(args[0]))
+        if (!isZero(args[0]))
             throw new Error('transfer: unexpected')
-        let amount = <bigint> this.wai.peek(args[2], ABI_DATA_TYPE.u256)
-        let to = <ArrayBuffer> this.wai.peek(args[1], ABI_DATA_TYPE.address)
+        let amount = <bigint>this.wai.peek(args[2], ABI_DATA_TYPE.u256)
+        let to = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
         this.world.subBalance(this.ctx.contractAddress, amount)
         this.world.addBalance(to, amount)
     }

@@ -191,7 +191,7 @@ export function normalizeParams(params?: AbiInput | AbiInput[] | Record<string, 
  * @param outputs abi 中的 outputs 数组，包含了类型，如果 outputs 数组中的每个 TypeDef 的 name 都有值，会返回一个 JSON 对象，否则返回一个数组
  * @param buf 
  */
-function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | Record<string, Readable> {
+export function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | Record<string, Readable> {
     buf = buf || []
     const len = buf.length
     if (len === 0)

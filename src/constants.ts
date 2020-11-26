@@ -1,4 +1,5 @@
 import { Transaction } from "./tx"
+import { CallContext } from "./vm"
 
 /**
  * 整数或者十进制、十六进制表示的整数字符串
@@ -120,10 +121,19 @@ export interface Header {
     size: number
 }
 
-export interface Block extends Header{
+export interface Block extends Header {
     body: Transaction[]
 }
 
 // 2020-10-25T09:57:15+08:00
 export const OFFSET_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+[0-9]{2}:[0-9]{2}$/
 
+export interface WorkerData {
+    lock: Int32Array
+    dumped: ArrayBuffer
+    method: string,
+    ctx: CallContext,
+    params: Readable[],
+    ret: ABI_DATA_TYPE[]
+    buf: SharedArrayBuffer
+}

@@ -72,12 +72,6 @@ async function main() {
         hash: '9cbf30db111483e4b84e77ca0e39378fd7605e1b'
     })
     await vm.deploy(origin, './db.wasm')
-    const encoded = (await vm.deploy(origin, './rlp.wasm')).result
-    const enc = rlp.encode([
-        '', '', 0, '', new Uint8Array(20).buffer, new Uint8Array(20).buffer, '',
-        0, new ArrayBuffer(0), 0, false,
-        new ArrayBuffer(0)
-    ])
 }
 
 main().catch(console.error)

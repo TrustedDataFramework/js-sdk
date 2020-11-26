@@ -80,8 +80,6 @@ export function publicKey2Address(pk: Binary): string {
  * @param str 字符串
  */
 export function str2bin(str: string): Uint8Array {
-    if (typeof Buffer === 'function')
-        return Buffer.from(str, 'utf-8')
     if (typeof TextEncoder === 'function')
         return new TextEncoder().encode(str)
     throw new Error('encode string to utf8 failed')
@@ -165,8 +163,6 @@ export function hex2bin(s: string | ArrayBuffer | Uint8Array): Uint8Array {
         return s
     if (s.startsWith('0x'))
         s = s.substr(2, s.length - 2)
-    if(typeof Buffer === 'function' && typeof s === 'string')
-        return Buffer.from(s, 'hex')   
     assert(s.length % 2 === 0, 'invalid char');
     const ret = new Uint8Array(s.length / 2);
     for (let i = 0; i < s.length / 2; i++) {
@@ -220,8 +216,6 @@ export function bin2hex(input: Binary | number[]): string {
     if (!(input instanceof Uint8Array))
         input = new Uint8Array(input)
     // input maybe Buffer or Uint8Array
-    if (typeof Buffer === 'function')
-        return Buffer.from(input).toString('hex')
     return Array.prototype.map.call(input, x => ('00' + x.toString(16)).slice(-2)).join('');
 }
 

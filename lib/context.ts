@@ -141,7 +141,10 @@ export class Address {
             changetype<usize>(encodedParams), changetype<usize>(amount),
             0
         )
-
+        if(isFloat<T>())
+            return reinterpret<T>(r)
+        if(isInteger<T>())
+            return r as T
         if (!isVoid<T>()) {
             return changetype<T>(usize(r))
         }
