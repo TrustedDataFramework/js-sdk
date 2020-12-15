@@ -4,7 +4,7 @@ const path = require('path')
 const child_process = require('child_process')
 
 // build typescript
-child_process.execSync('tsc')
+child_process.execFileSync(path.join(__dirname, 'node_modules/.bin/tsc'))
 
 console.log('build typescript success')
 

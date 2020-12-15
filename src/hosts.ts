@@ -225,14 +225,14 @@ export class ContextHost extends AbstractHost {
             }
             case ContextType.ACCOUNT_BALANCE: {
                 let addr = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
-                let b: bigint = this.world.balanceMap.get(bin2hex(addr)) || ZERO
+                let b: bigint = <bigint> (this.world.balanceMap.get(bin2hex(addr)) || ZERO)
                 return BigInt(this.wai.malloc(b, ABI_DATA_TYPE.u256))
             }
             case ContextType.MSG_SENDER: {
                 return BigInt(this.wai.malloc(this.ctx.sender, ABI_DATA_TYPE.address))
             }
             case ContextType.MSG_AMOUNT: {
-                return BigInt(this.wai.malloc(this.ctx.amount || ZERO, ABI_DATA_TYPE.u256))
+                return BigInt(this.wai.malloc(<bigint>(this.ctx.amount || ZERO), ABI_DATA_TYPE.u256))
             }
             case ContextType.CONTRACT_CODE: {
                 let addr = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)

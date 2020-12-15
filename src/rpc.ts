@@ -6,8 +6,8 @@ import { Transaction } from "./tx";
 
 export interface Account {
     address: string
-    nonce: number | bigint
-    balance: number | bigint
+    nonce: number | bigint | string
+    balance: number | bigint | string
     createdBy: string
     contractHash: string
     storageRoot: string
@@ -15,12 +15,12 @@ export interface Account {
 
 export interface TransactionResult {
     transactionHash?: string
-    blockHeight?: number | bigint
+    blockHeight?: number | bigint | string
     blockHash?: string
-    gasUsed?: bigint | number
+    gasUsed?: bigint | number | string
     events?: {name: string, data: any}[]
     result?: Readable
-    fee?: bigint | number
+    fee?: bigint | number | string
     method?: string
     inputs?: AbiInput[] | Record<string, AbiInput>
 }
@@ -41,9 +41,9 @@ interface TransactionResp extends Resp {
     hash: string
     status: TX_STATUS
     reason?: string
-    blockHeight?: number | bigint
+    blockHeight?: number | bigint | string
     blockHash?: string
-    gasUsed?: bigint | number
+    gasUsed?: bigint | number | string
     events?: [Uint8Array, Uint8Array[]][]
     result?: Uint8Array[]
 }
@@ -211,7 +211,7 @@ export class RPC {
             // 把两个回调函数包成一个回调函数
             const fn = this.ws.onopen || ((e) => { })
             const onErr = this.ws.onerror || (e => { })
-            const p = new Promise((rs, rj) => {
+            const p = new Promise<void>((rs, rj) => {
                 this.ws.onopen = (e) => {
                     fn.call(this.ws, e)
                     rs()
@@ -221,7 +221,7 @@ export class RPC {
                     onErr.call(this.ws, e)
                 }
             })
-            return <Promise<void>>p
+            return p
         }
 
         this.uuid = uuidv4()

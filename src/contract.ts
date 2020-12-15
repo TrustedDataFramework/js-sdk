@@ -1,4 +1,4 @@
-import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE } from "./utils";
+import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE, add} from "./utils";
 import {
     ABI_DATA_TYPE,
     ABI_TYPE,
@@ -9,12 +9,14 @@ import {
     MAX_U64,
     ONE,
     Readable,
-    AbiEncoded
+    AbiEncoded,
+    bigi
 } from "./constants";
 import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
 import { OutputStream } from 'assemblyscript/cli/asc'
 import * as path from "path";
+import BN = require("../bn");
 
 class MemoryOutputStream implements OutputStream {
     buf: Uint8Array
@@ -181,7 +183,7 @@ export class ABI {
 export function normalizeParams(params?: AbiInput | AbiInput[] | Record<string, AbiInput>): AbiInput[] | Record<string, AbiInput> {
     if (params === null || params === undefined)
         return []
-    if (typeof params === 'bigint' || typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array)
+    if (typeof params === 'bigint' || typeof params === 'string' || typeof params === 'boolean' || typeof params === 'number' || params instanceof ArrayBuffer || params instanceof Uint8Array || params instanceof BN)
         return [params]
     return params
 }
@@ -230,14 +232,14 @@ export function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | 
                 break
             }
             case 'i64': {
-                let n: bigint
+                let n: bigi
                 const padded = padPrefix(arr[i], 0, 8)
                 const isneg = padded[0] & 0x80
                 if (!isneg) {
                     n = decodeBE(arr[i])
                 } else {
                     n = decodeBE(inverse(padded))
-                    n = n + ONE
+                    n = add(n, ONE)
                     n = - n
                 }
                 val = toSafeInt(n)
@@ -300,7 +302,7 @@ export class Contract {
 
 
         if (Array.isArray(li)) {
-            const arr: Array<string | Uint8Array | bigint | number> = []
+            const arr: Array<string | Uint8Array | bigi | number> = []
             const types = []
             if (li.length != func.inputs.length)
                 throw new Error(`abi encode failed for ${func.name}, expect ${func.inputs.length} parameters while ${li.length} found`)
@@ -311,7 +313,7 @@ export class Contract {
             return [types, arr, retTypes]
         }
 
-        const arr: Array<string | Uint8Array | bigint | number> = []
+        const arr: Array<string | Uint8Array | bigi | number> = []
         const types = []
         for (let i = 0; i < func.inputs.length; i++) {
             const input = func.inputs[i]

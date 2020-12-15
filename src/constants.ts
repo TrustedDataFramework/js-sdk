@@ -1,10 +1,13 @@
 import { Transaction } from "./tx"
 import { CallContext } from "./vm"
+import BN = require('../bn')
+
+export type bigi = bigint | BN
 
 /**
  * 整数或者十进制、十六进制表示的整数字符串
  */
-export type Digital = string | number | bigint
+export type Digital = string | number | bigi
 
 /**
  * 二进制流 或者 十六进制编码后的二进制流, Nodejs 中的 Buffer 是 Uint8Array 的实现
@@ -19,14 +22,14 @@ export type Readable = string | number | boolean | bigint
 /**
  * 表示合法的合约调用参数类型
  */
-export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | bigint
+export type AbiInput = string | number | boolean | ArrayBuffer | Uint8Array | bigi
 
 export type RLPElement = Uint8Array | Uint8Array[]
 
 /**
  * AbiEncoded 后的结果, 用于调用合约 [输入类型[], 输入[], 输出类型[]]
  */
-export type AbiEncoded = [ABI_DATA_TYPE[], Array<string | Uint8Array | bigint | number>, ABI_DATA_TYPE[]]
+export type AbiEncoded = [ABI_DATA_TYPE[], Array<string | Uint8Array | bigi | number>, ABI_DATA_TYPE[]]
 
 /**
  * 事务的状态
@@ -98,16 +101,16 @@ export enum ABI_DATA_TYPE {
     u256
 }
 
-export const MAX_U64 = BigInt('0xffffffffffffffff')
-export const MAX_U256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
-export const MAX_I64 = BigInt('9223372036854775807')
-export const MIN_I64 = BigInt('-9223372036854775808')
+export const MAX_U64: bigi = typeof BigInt === 'function' ? BigInt('0xffffffffffffffff') : new BN('ffffffffffffffff', 16)
+export const MAX_U256 = typeof BigInt === 'function' ? BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff') : new BN('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 16)
+export const MAX_I64 = typeof BigInt === 'function' ? BigInt('9223372036854775807') : new BN('9223372036854775807')
+export const MIN_I64 = typeof BigInt === 'function' ? BigInt('-9223372036854775808') : new BN('-9223372036854775808')
 
-export const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
-export const MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER)
+export const MAX_SAFE_INTEGER: bigi = typeof BigInt === 'function' ? BigInt(Number.MAX_SAFE_INTEGER) : new BN(Number.MAX_SAFE_INTEGER)
+export const MIN_SAFE_INTEGER: bigi = typeof BigInt === 'function' ? BigInt(Number.MIN_SAFE_INTEGER) : new BN(Number.MIN_SAFE_INTEGER)
 
-export const ONE = BigInt(1)
-export const ZERO = BigInt(0)
+export const ONE: bigi = typeof BigInt === 'function' ? BigInt(1) : new BN(1)
+export const ZERO: bigi = typeof BigInt === 'function' ? BigInt(0) : new BN(0)
 
 export interface Header {
     stateRoot: string,

@@ -5,6 +5,7 @@ import { constants, ABI_DATA_TYPE, Readable } from './constants'
 import rlp = require('./rlp')
 import { Encoder } from "./rlp";
 import { ABI, Contract } from './contract'
+import BN = require('../bn');
 
 
 /**
@@ -112,6 +113,8 @@ export class Transaction implements Encoder {
         const cnv: (i: AbiInput) => Readable = (x: AbiInput) => {
             if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                 return bin2hex(x)
+            if(x instanceof BN)
+                return x.toString(10)
             return x
         }
         if (Array.isArray(__inputs)) {

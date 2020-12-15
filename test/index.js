@@ -65,8 +65,6 @@ async function main() {
         createdAt: 12345,
         gasLimit: 12345678,
         gasPrice: 123456789,
-        signature: 'aabbccddeeff',
-        hash: 'aabbccddeeff',
         to: '9cbf30db111483e4b84e77ca0e39378fd7605e1b',
         signature: '9cbf30db111483e4b84e77ca0e39378fd7605e1b',
         hash: '9cbf30db111483e4b84e77ca0e39378fd7605e1b'

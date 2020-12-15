@@ -1,5 +1,6 @@
-import { RLPElement } from "./constants";
+import { bigi, RLPElement } from "./constants";
 import { bin2str, encodeBE } from './utils'
+import BN = require('../bn')
 
 const OFFSET_SHORT_ITEM = 0x80;
 const SIZE_THRESHOLD = 56;
@@ -179,7 +180,7 @@ export function encodeString(s: string): Uint8Array {
  * rlp 编码，参数必须是字符串、正整数、零、null、字节流 数组类型
  * @param o
  */
-export function encode(o: string | any[] | number | null | Uint8Array | ArrayBuffer | Encoder | boolean | bigint): Uint8Array {
+export function encode(o: string | any[] | number | null | Uint8Array | ArrayBuffer | Encoder | boolean | bigi): Uint8Array {
     if (o && (typeof (<Encoder>o).getEncoded === 'function')) {
         return (<Encoder>o).getEncoded()
     }
@@ -197,7 +198,7 @@ export function encode(o: string | any[] | number | null | Uint8Array | ArrayBuf
         return o ? new Uint8Array([0x01]) : NULL_RLP
     if (o instanceof Uint8Array)
         return encodeBytes(o)
-    if (typeof o === 'bigint') {
+    if (typeof o === 'bigint' || o instanceof BN) {
         return encodeBytes(encodeBE(o))
     }
     if (Array.isArray(o)) {

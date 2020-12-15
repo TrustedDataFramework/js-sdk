@@ -1,6 +1,6 @@
-import {Digital, ONE, constants, Binary, AbiInput, ZERO} from './constants'
+import { Digital, ONE, constants, Binary, AbiInput, ZERO } from './constants'
 import { Transaction } from './tx'
-import { bin2hex, dig2str, privateKey2PublicKey, assert, toSafeInt, toBigN } from './utils'
+import { bin2hex, dig2str, privateKey2PublicKey, assert, toSafeInt, toBigN, add } from './utils'
 import { Contract, normalizeParams } from './contract'
 import rlp = require('./rlp')
 
@@ -30,7 +30,7 @@ export class TransactionBuilder {
 
 
     increaseNonce(): void {
-        this.nonce = BigInt(this.nonce) + ONE
+        this.nonce = add(toBigN(this.nonce), ONE)
     }
 
     /**

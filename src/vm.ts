@@ -180,7 +180,7 @@ export class WasmInterface {
                 return utf8Decoder.decode(bin)
             }
             case ABI_DATA_TYPE.u256:
-                return decodeBE(bin)
+                return <bigint>decodeBE(bin)
             case ABI_DATA_TYPE.bytes:
             case ABI_DATA_TYPE.address:
                 return bin
@@ -325,7 +325,7 @@ export class VirtualMachine {
         });
 
         (decoded[5] as any[]).forEach((arr: [Uint8Array, Uint8Array]) => {
-            vm.balanceMap.set(bin2hex(arr[0]), toBigN(arr[1]))
+            vm.balanceMap.set(bin2hex(arr[0]), <bigint>toBigN(arr[1]))
         });
 
         vm.now = rlp.byteArrayToInt(<Uint8Array>decoded[6]);
@@ -362,7 +362,7 @@ export class VirtualMachine {
     }
 
     alloc(address: Binary, amount: Digital): void {
-        this.balanceMap.set(normalizeAddress(address), toBigN(amount))
+        this.balanceMap.set(normalizeAddress(address), <bigint>toBigN(amount))
     }
 
     // 模拟区块的生成
@@ -375,15 +375,15 @@ export class VirtualMachine {
 
     addBalance(addr: Binary, amount?: Digital) {
         let hex = normalizeAddress(addr)
-        let balance: bigint = this.balanceMap.get(hex) || ZERO
-        balance = balance + toBigN(amount || ZERO)
+        let balance: bigint = <bigint>(this.balanceMap.get(hex) || ZERO)
+        balance = balance + <bigint>toBigN(amount || ZERO)
         this.balanceMap.set(hex, balance)
     }
 
     subBalance(addr: Binary, amount?: Digital) {
         let hex = normalizeAddress(addr)
-        let balance: bigint = this.balanceMap.get(hex) || ZERO
-        let a = toBigN(amount || ZERO)
+        let balance: bigint = <bigint>(this.balanceMap.get(hex) || ZERO)
+        let a = <bigint>toBigN(amount || ZERO)
         if (balance < a)
             throw new Error(`the balance of ${hex} is not enough`)
         balance = balance - a
@@ -405,18 +405,18 @@ export class VirtualMachine {
         return {
             version: <number>toSafeInt(opts.version || constants.POA_VERSION),
             createdAt: <number>toSafeInt(opts.createdAt || this.now),
-            gasLimit: toBigN(opts.gasLimit || 0),
-            gasPrice: toBigN(opts.gasPrice || 0),
+            gasLimit: <bigint>toBigN(opts.gasLimit || 0),
+            gasPrice: <bigint>toBigN(opts.gasPrice || 0),
             signature: hex2bin(opts.signature || new Uint8Array(64)).buffer,
             type: null,
             sender: senderAddr,
-            amount: toBigN(amount),
+            amount: <bigint>toBigN(amount),
             nonce: n,
             origin: senderAddr,
             txHash: hex2bin(opts.hash || this.getTxHash(senderAddr, n)).buffer,
             contractAddress: contractAddrBin,
             readonly: false,
-            txAmount: toBigN(amount),
+            txAmount: <bigint>toBigN(amount),
             to: hex2bin(opts.to || (deploy ? '' : contractAddrBin)).buffer,
             events: []
         }
@@ -457,14 +457,14 @@ export class VirtualMachine {
         return ret.result
     }
 
-    private async createInstance(file: string, env: any): Promise<VMInstance>{
+    private async createInstance(file: string, env: any): Promise<VMInstance> {
         if (typeof WebAssembly.instantiateStreaming === 'function' && typeof fetch === 'function') {
             return <VMInstance>(await WebAssembly.instantiateStreaming(fetch(file), {
                 env: env
             })).instance
         }
         const fs = require('fs')
-        return <VMInstance> (await WebAssembly.instantiate(fs.readFileSync(file), {env: env})).instance
+        return <VMInstance>(await WebAssembly.instantiate(fs.readFileSync(file), { env: env })).instance
     }
 
     async callInternal(method: string, ctx?: CallContext, params?: AbiInput | AbiInput[] | Record<string, AbiInput>): Promise<TransactionResult> {
@@ -491,7 +491,7 @@ export class VirtualMachine {
         const abi = await this.fetchABI(file)
 
         const a = abi.filter(x => x.type === 'function' && x.name === method)[0]
-        if(method === 'init' && !a)
+        if (method === 'init' && !a)
             return r
 
         let mem = new WebAssembly.Memory({ initial: 10, maximum: 65535 })
@@ -532,7 +532,7 @@ export class VirtualMachine {
         const args = []
         for (let i = 0; i < a.inputs.length; i++) {
             const t = ABI_DATA_TYPE[a.inputs[i].type]
-            args.push(wai.malloc(arr[i], t))
+            args.push(wai.malloc(<bigint>arr[i], t))
         }
         let ret = instance.exports[method].apply(instance.exports, args)
 

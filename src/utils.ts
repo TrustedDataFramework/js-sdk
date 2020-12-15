@@ -1,24 +1,25 @@
-import { AbiInput, Binary, Digital } from "./constants"
+import { AbiInput, Binary, Digital, bigi } from "./constants"
 import { ABI_DATA_TYPE, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, MIN_SAFE_INTEGER, ONE, ZERO } from './constants'
 import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
 import { Transaction } from "./tx"
 import { Server } from 'http'
+import BN = require("../bn")
 
-const UTF8Decoder =  new TextDecoder('utf-8')
+const UTF8Decoder = new TextDecoder('utf-8')
 
 /**
  * 将有符号整数转成 64 bit 位码，负数会被当作补码处理
  * @param i 
  */
-export function i64ToLong(i: number | bigint): bigint{
-    if(i >= 0)
-        return BigInt(i)
+export function i64ToLong(i: number | bigi): bigi {
+    if (i >= 0)
+        return toBigN(i)
     // 计算补码的过程:    
     // 1. 计算对应的正整数的位码
     // 2. 取反
     // 3. 加上1
     let buf = inverse(encodeBE(-i, 64))
-    return decodeBE(buf) + ONE
+    return add(decodeBE(buf), ONE)
 }
 
 /**
@@ -36,7 +37,7 @@ export function bytesToF64(buf: Uint8Array): number {
  * @param size 
  */
 export function padPrefix(arr: Uint8Array, prefix: number, size: number) {
-    if(prefix < 0 || prefix > 255)
+    if (prefix < 0 || prefix > 255)
         throw new Error(`invalid byte ${prefix}, should between 0 and 255`)
     if (arr.length >= size)
         return arr
@@ -101,7 +102,7 @@ export function inverse(arr: Uint8Array): Uint8Array {
  * 取出浮点数的位码，用8位长整数表示
  * @param f 
  */
-export function f64ToLong(f: number): bigint {
+export function f64ToLong(f: number): bigi {
     let buf = new ArrayBuffer(8)
     let v = new DataView(buf)
     v.setFloat64(0, f, false)
@@ -113,10 +114,16 @@ export function f64ToLong(f: number): bigint {
  * 解析浮点数的位码，转回浮点数
  * @param f 
  */
-export function Long2F64(f: bigint): number {
+export function Long2F64(f: bigi): number {
     let buf = new ArrayBuffer(8)
-    let v = new DataView(buf)
-    v.setBigUint64(0, f, false)
+    if(typeof f === 'bigint'){
+        let v = new DataView(buf)
+        v.setBigUint64(0, f, false)
+    }else{
+        let v = new Uint8Array(buf)
+        let encoded = encodeBE(f)
+        v.set(encoded)
+    }
     return new DataView(buf).getFloat64(0, false)
 }
 
@@ -187,15 +194,15 @@ export function dig2str(s: Digital): string {
     return BigInt(s).toString()
 }
 
-export function normalizeAddress(addr: Binary): string{
+export function normalizeAddress(addr: Binary): string {
     let b = hex2bin(addr)
     // private key
-    if(b.length === 32)
+    if (b.length === 32)
         return publicKey2Address(privateKey2PublicKey(addr))
     // public key
-    if(b.length === 33)
+    if (b.length === 33)
         return publicKey2Address(addr)
-    if(b.length === 20)
+    if (b.length === 20)
         return bin2hex(b)
     throw new Error(`normalize address failed: invalid length = ${b.length}`)
 }
@@ -223,8 +230,8 @@ export function bin2hex(input: Binary | number[]): string {
  * 将二进制流转成字符串, UTF8 编码
  * @param bin 
  */
-export function bin2str(bin: Uint8Array | ArrayBuffer | string): string{
-    if(typeof bin === 'string')
+export function bin2str(bin: Uint8Array | ArrayBuffer | string): string {
+    if (typeof bin === 'string')
         return bin
     return UTF8Decoder.decode(bin)
 }
@@ -234,7 +241,7 @@ export function bin2str(bin: Uint8Array | ArrayBuffer | string): string{
  * @param o 
  * @param type 
  */
-export function convert(o: string | Uint8Array | number | ArrayBuffer | boolean | bigint, type: ABI_DATA_TYPE): Uint8Array | string | bigint | number{
+export function convert(o: string | Uint8Array | number | ArrayBuffer | boolean | bigi, type: ABI_DATA_TYPE): Uint8Array | string | bigi | number {
     if (o instanceof ArrayBuffer)
         o = new Uint8Array(o)
     if (o instanceof Uint8Array) {
@@ -332,15 +339,15 @@ export function convert(o: string | Uint8Array | number | ArrayBuffer | boolean 
         }
     }
 
-    if (typeof o === 'bigint') {
+    if (typeof o === 'bigint' || o instanceof BN) {
         switch (type) {
             case ABI_DATA_TYPE.u256:
             case ABI_DATA_TYPE.u64: {
                 // 64位无符号 和 256 位无符号整数必须大于0，而且不能溢出
                 if (type === ABI_DATA_TYPE.u64)
-                    assert(o <= MAX_U64 && o >= 0, `${o.toString(10)} overflows u64 ${MAX_U64.toString(10)}`)
+                    assert(cmp(o, MAX_U64) <= 0 && cmp(o, ZERO) >= 0, `${o.toString(10)} overflows u64 ${MAX_U64.toString(10)}`)
                 if (type === ABI_DATA_TYPE.u256)
-                    assert(o <= MAX_U256 && o >= 0, `${o.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)                
+                    assert(cmp(o, MAX_U256) <= 0 && cmp(o, ZERO) >= 0, `${o.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                 return o
             }
             case ABI_DATA_TYPE.string: {
@@ -351,20 +358,20 @@ export function convert(o: string | Uint8Array | number | ArrayBuffer | boolean 
                 throw new Error("cannot convert number to address or bytes")
             }
             case ABI_DATA_TYPE.bool: {
-                if (o == BigInt(0) || o == BigInt(1))
+                if (cmp(o, ZERO) === 0 || cmp(o, ONE) === 0)
                     return o
                 throw new Error(`convert ${o} to bool failed, provide 1 or 0`)
             }
             case ABI_DATA_TYPE.i64: {
                 assert(o <= MAX_I64, `${o.toString(10)} overflows max i64 ${MAX_I64.toString(10)}`)
                 assert(o >= MIN_I64, `${o.toString(10)} overflows min i64 ${MIN_I64.toString(10)}`)
-                if (o >= 0)
+                if (cmp(o, ZERO) >= 0)
                     return o
                 return i64ToLong(o)
             }
             case ABI_DATA_TYPE.f64: {
                 // 大整数转 float 可能会丢失精度
-                if( o < MIN_SAFE_INTEGER || o > MAX_SAFE_INTEGER){
+                if (o < MIN_SAFE_INTEGER || o > MAX_SAFE_INTEGER) {
                     throw new Error(`cast bigint ${o} to float will lose precision`)
                 }
                 console.warn(`cast bigint ${o} to float may lose precision, you should always avoid it`)
@@ -400,12 +407,12 @@ export function convert(o: string | Uint8Array | number | ArrayBuffer | boolean 
  * 大端解码, 返回无符号大整数
  * @param x 
  */
-export function decodeBE(x: ArrayBuffer | Uint8Array): bigint{
-    if(x instanceof Uint8Array && x.length === 0)
+export function decodeBE(x: ArrayBuffer | Uint8Array): bigi {
+    if (x instanceof Uint8Array && x.length === 0)
         return ZERO
-    if(x instanceof ArrayBuffer && x.byteLength === 0)
+    if (x instanceof ArrayBuffer && x.byteLength === 0)
         return ZERO
-    return BigInt('0x' + bin2hex(x))
+    return typeof BigInt === 'function' ? BigInt('0x' + bin2hex(x)) : new BN(bin2hex(x), 16)
 }
 
 
@@ -414,39 +421,64 @@ export function decodeBE(x: ArrayBuffer | Uint8Array): bigint{
  * @param x 
  * @param bits 
  */
-export function encodeBE(x: number | BigInt, bits?: number): Uint8Array{
-    if(x === 0 || x === ZERO)
+export function encodeBE(x: number | bigi, bits?: number): Uint8Array {
+    if (x === 0 || x === ZERO)
         return new Uint8Array(0)
     let str = x.toString(16)
     str = str.length % 2 === 0 ? str : '0' + str
     let arr = hex2bin(str)
-    if(bits === undefined)
+    if (bits === undefined)
         return arr
     let bytes = bits / 8
-    if(Number.isInteger(bytes) && bytes < 0)
+    if (Number.isInteger(bytes) && bytes < 0)
         throw new Error(`invalid bits number ${bits}, should be positive and `)
-    if(arr.length > bytes)
+    if (arr.length > bytes)
         throw new Error('encode failed, overflow')
     return padPrefix(arr, 0, bytes)
+}
+
+// 整数相加
+export function add(x: bigi, y: bigi): bigi {
+    if (typeof x === 'bigint' && typeof y === 'bigint') {
+        return x + y
+    }
+    return (<BN>x).add(<BN>y)
+}
+
+// 整数比较
+export function cmp(x: bigi, y: bigi): number {
+    if (typeof x === 'bigint' && typeof y === 'bigint') {
+        if (x < y)
+            return -1
+        if (x === y)
+            return 0
+        return 1
+    }
+    return (<BN>x).cmp(<BN>y)
 }
 
 /**
  * 转成 js 大整数
  * @param x 十六进制的整数或者字符串 或者大端编码的字节数组
  */
-export function toBigN(x: string | number | bigint | ArrayBuffer | Uint8Array ): bigint{
-    if(x === undefined || x === null)
+export function toBigN(x: string | number | bigi | ArrayBuffer | Uint8Array): bigi {
+    if (x === undefined || x === null)
         throw new Error(`toSafeInt: expect value while ${x} found`)
-    if(typeof x === 'bigint'){
+    if (typeof x === 'bigint' || x instanceof BN) {
         return x
     }
-    if (typeof x === 'number'){
-        if(!Number.isInteger(x))
+    if (typeof x === 'number') {
+        if (!Number.isInteger(x))
             throw new Error(`convert x to integer failed: ${x} is not integer`)
-        return BigInt(x)
+        if (typeof BigInt === 'function') {
+            return BigInt(x)
+        }
+        return new BN(x)
     }
     if (typeof x === 'string') {
-        return BigInt(x)
+        if (typeof BigInt === 'function')
+            return BigInt(x)
+        return new BN(x.startsWith('0x') ? x.substring(2) : x, 16, 'be')
     }
     return decodeBE(<any>x)
 }
@@ -455,23 +487,23 @@ export function toBigN(x: string | number | bigint | ArrayBuffer | Uint8Array ):
  * 转成 js 安全范围内的整数，避免丢失精度
  * @param x 十六进制的整数或者字符串 或者大端编码的字节数组
  */
-export function toSafeInt(x: string | number | bigint | ArrayBuffer | Uint8Array ): bigint | number {
+export function toSafeInt(x: string | number | bigi | ArrayBuffer | Uint8Array | BigInteger): bigint | number | string{
     let i = toBigN(x)
-    if(i < MIN_SAFE_INTEGER ||  i > MAX_SAFE_INTEGER){
-        return i
+    if (cmp(i, MIN_SAFE_INTEGER) < 0 || cmp(i, MAX_SAFE_INTEGER) > 0) {
+        return typeof i === 'bigint' ? i : i.toString(10)
     }
-    return Number(i)
+    return typeof i === 'bigint' ? Number(i) : i.toNumber()
 }
 
 /**
  * 转成 js 安全范围内的整数字符串，避免丢失精度
  * @param x 十六进制的整数或者字符串 或者大端编码的字节数组
  */
-export function toSafeDig(x: string | number | bigint | ArrayBuffer | Uint8Array ): string | number {
+export function toSafeDig(x: string | number | bigi | ArrayBuffer | Uint8Array): string | number {
     let i = toBigN(x)
-    if(i < MAX_SAFE_INTEGER ||  i > MAX_SAFE_INTEGER)
-        return i.toString()
-    return Number(i)
+    if (cmp(i, MAX_SAFE_INTEGER) < 0 || cmp(i, MAX_SAFE_INTEGER) > 0)
+        return i.toString(10)
+    return typeof i === 'bigint' ? Number(i) : i.toNumber()
 }
 
 
@@ -606,7 +638,7 @@ export function readKeyStore(ks: KeyStore, password: string): string {
     )
     k = k.slice(0, 16)
     let mac = sm3(concatBytes(k, hex2bin(ks.crypto.cipherText)))
-    if(mac !== ks.mac)
+    if (mac !== ks.mac)
         throw new Error('read private from keystore failed: incorrect password')
     if (!ks.crypto.cipher || "sm4-128-ecb" !== ks.crypto.cipher) {
         throw new Error("unsupported crypto cipher " + ks.crypto.cipher);
@@ -654,4 +686,10 @@ export function createAuthServer(privateKey: Binary, whiteList: Binary[]): Serve
 
     })
     return server
+}
+
+export function neg(x: bigi): bigi{
+    if(typeof x === 'bigint')
+        return -x
+    return x.neg()
 }
