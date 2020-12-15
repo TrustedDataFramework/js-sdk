@@ -191,7 +191,7 @@ export function assert(truth: any, err: string) {
  * @param s 
  */
 export function dig2str(s: Digital): string {
-    return BigInt(s).toString()
+    return toBigN(s).toString(10)
 }
 
 export function normalizeAddress(addr: Binary): string {
@@ -329,8 +329,8 @@ export function convert(o: string | Uint8Array | number | ArrayBuffer | boolean 
                     throw new Error('o is negative or not a integer')
                 if (o >= 0)
                     return o
-                // 转成 bigint 再转 i64
-                return convert(BigInt(o), ABI_DATA_TYPE.i64)
+                // 转成 bigi 再转 i64
+                return convert(toBigN(o), ABI_DATA_TYPE.i64)
             }
             case ABI_DATA_TYPE.f64: {
                 // number 在 js 中就是双精度浮点数
@@ -478,7 +478,7 @@ export function toBigN(x: string | number | bigi | ArrayBuffer | Uint8Array): bi
     if (typeof x === 'string') {
         if (typeof BigInt === 'function')
             return BigInt(x)
-        return new BN(x.startsWith('0x') ? x.substring(2) : x, 16, 'be')
+        return new BN(x.startsWith('0x') ? x.substring(2) : x, x.startsWith('0x') ? 16 : 10, 'be')
     }
     return decodeBE(<any>x)
 }
@@ -487,7 +487,7 @@ export function toBigN(x: string | number | bigi | ArrayBuffer | Uint8Array): bi
  * 转成 js 安全范围内的整数，避免丢失精度
  * @param x 十六进制的整数或者字符串 或者大端编码的字节数组
  */
-export function toSafeInt(x: string | number | bigi | ArrayBuffer | Uint8Array | BigInteger): bigint | number | string{
+export function toSafeInt(x: string | number | bigi | ArrayBuffer | Uint8Array): bigint | number | string{
     let i = toBigN(x)
     if (cmp(i, MIN_SAFE_INTEGER) < 0 || cmp(i, MAX_SAFE_INTEGER) > 0) {
         return typeof i === 'bigint' ? i : i.toString(10)
@@ -692,4 +692,10 @@ export function neg(x: bigi): bigi{
     if(typeof x === 'bigint')
         return -x
     return x.neg()
+}
+
+export function mul(x: bigi, y: bigi): bigi{
+    if(typeof x === 'bigint' && typeof y === 'bigint')
+        return x * y
+    return (<BN>x).mul(<BN> y)
 }

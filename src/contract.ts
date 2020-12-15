@@ -1,4 +1,4 @@
-import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE, add} from "./utils";
+import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE, add, neg, cmp} from "./utils";
 import {
     ABI_DATA_TYPE,
     ABI_TYPE,
@@ -225,9 +225,9 @@ export function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | 
             case 'u64': {
                 const n = decodeBE(arr[i])
                 if (t === 'u64')
-                    assert(n <= MAX_U64, `${n.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
+                    assert(cmp(n, MAX_U64) <= 0, `${n.toString(10)} overflows max u64 ${MAX_U64.toString(10)}`)
                 if (t === 'u256')
-                    assert(n <= MAX_U256, `${n.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
+                    assert(cmp(n, MAX_U256) <= 0, `${n.toString(10)} overflows max u256 ${MAX_U256.toString(10)}`)
                 val = toSafeInt(n)
                 break
             }
@@ -240,7 +240,7 @@ export function abiDecode(outputs: TypeDef[], buf?: Uint8Array[]): Readable[] | 
                 } else {
                     n = decodeBE(inverse(padded))
                     n = add(n, ONE)
-                    n = - n
+                    n = neg(n)
                 }
                 val = toSafeInt(n)
                 break

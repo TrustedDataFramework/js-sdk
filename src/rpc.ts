@@ -1,4 +1,4 @@
-import { bin2hex, bin2str, hex2bin, publicKey2Address, toSafeDig, toSafeInt, uuidv4 } from "./utils"
+import { bin2hex, bin2str, hex2bin, publicKey2Address, toBigN, toSafeDig, toSafeInt, uuidv4, mul} from "./utils"
 import rlp = require("./rlp")
 import { AbiInput, Binary, constants, Readable, RLPElement, TX_STATUS, Block, OFFSET_DATE, Header} from "./constants"
 import { Contract, normalizeParams } from "./contract";
@@ -522,7 +522,7 @@ export class RPC {
                     }
 
                     ret.transactionHash = tx.getHash()
-                    ret.fee = toSafeInt((BigInt(tx.gasPrice) * BigInt(ret.gasUsed)))
+                    ret.fee = toSafeInt(mul(toBigN(tx.gasPrice), toBigN(ret.gasUsed)))
                     if (tx.isDeployOrCall() && !tx.isBuiltInCall()) {
                         ret.method = tx.getMethod()
                         ret.inputs = tx.__inputs
