@@ -1,5 +1,5 @@
 import { normalizeAddress, bin2hex, bin2str, hex2bin, encodeBE, toSafeInt, decodeBE, toBigN, convert } from "./utils"
-import { ABI, getContractAddress, normalizeParams, compileABI } from "./contract"
+import { ABI, getContractAddress, normalizeParams } from "./contract"
 import { Binary, AbiInput, Digital, ZERO, Readable, constants } from "./constants"
 import { ContextHost, DBHost, EventHost, Log, Reflect, Transfer, AbstractHost } from './hosts'
 
