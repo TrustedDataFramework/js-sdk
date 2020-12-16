@@ -116,6 +116,11 @@ export enum WS_CODES {
      * @see AbiEncoded
      */
     CONTRACT_QUERY,
+
+    /**
+     * 错误
+     */
+    ERROR
 }
 
 export class RPC {

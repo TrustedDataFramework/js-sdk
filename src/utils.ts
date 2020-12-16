@@ -422,7 +422,7 @@ export function decodeBE(x: ArrayBuffer | Uint8Array): bigi {
  * @param bits 
  */
 export function encodeBE(x: number | bigi, bits?: number): Uint8Array {
-    if (x === 0 || x === ZERO)
+    if (cmp(toBigN(x), ZERO) === 0)
         return new Uint8Array(0)
     let str = x.toString(16)
     str = str.length % 2 === 0 ? str : '0' + str

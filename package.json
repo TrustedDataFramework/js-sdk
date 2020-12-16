@@ -1,6 +1,6 @@
 {
   "name": "@salaku/js-sdk",
-  "version": "1.2.14",
+  "version": "1.2.16",
   "description": "js-sdk",
   "main": "dist/index.js",
   "scripts": {
