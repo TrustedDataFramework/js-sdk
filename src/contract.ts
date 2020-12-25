@@ -1,4 +1,4 @@
-import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE, add, neg, cmp} from "./utils";
+import { assert, bin2hex, bin2str, bytesToF64, convert, hex2bin, inverse, padPrefix, toSafeInt, concatBytes, str2bin, decodeBE, add, neg, cmp, digest} from "./utils";
 import {
     ABI_DATA_TYPE,
     ABI_TYPE,
@@ -12,7 +12,6 @@ import {
     AbiEncoded,
     bigi
 } from "./constants";
-import { sm3 } from '@salaku/sm-crypto'
 import rlp = require('./rlp');
 import { OutputStream } from 'assemblyscript/cli/asc'
 import * as path from "path";
@@ -464,6 +463,6 @@ export function getContractAddress(address: Binary, nonce: Digital): string {
     if (addr.length !== 20)
         throw new Error(`address length should be 20 while ${addr.length} found`)
     let buf = rlp.encode([addr, n])
-    buf = hex2bin(sm3(buf))
+    buf = hex2bin(digest(buf))
     return bin2hex(buf.slice(buf.length - 20, buf.length))
 }

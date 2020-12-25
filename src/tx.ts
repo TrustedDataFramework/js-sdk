@@ -1,6 +1,6 @@
-import { AbiInput, Binary, Digital, OFFSET_DATE } from './constants'
-import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeDig } from "./utils";
-import { sm3, sm2 } from '@salaku/sm-crypto'
+import { AbiInput, Binary, Digital, getEC, OFFSET_DATE } from './constants'
+import { bin2hex, dig2str, convert, bin2str, hex2bin, toSafeDig, digest, doSign } from "./utils";
+import { sm2 } from '@salaku/sm-crypto'
 import { constants, ABI_DATA_TYPE, Readable } from './constants'
 import rlp = require('./rlp')
 import { Encoder } from "./rlp";
@@ -73,7 +73,7 @@ export class Transaction implements Encoder {
      */
     getHash(): string {
         const buf = this.getSignaturePlain()
-        return sm3(buf)
+        return bin2hex(digest(buf))
     }
 
 
@@ -113,7 +113,7 @@ export class Transaction implements Encoder {
         const cnv: (i: AbiInput) => Readable = (x: AbiInput) => {
             if (x instanceof ArrayBuffer || x instanceof Uint8Array)
                 return bin2hex(x)
-            if(x instanceof BN)
+            if (x instanceof BN)
                 return x.toString(10)
             return x
         }
@@ -160,11 +160,6 @@ export class Transaction implements Encoder {
     }
 
     sign(sk: Binary) {
-        this.signature =
-            sm2.doSignature(
-                this.getSignaturePlain(),
-                bin2hex(sk),
-                { userId: 'userid@soie-chain.com', der: false, hash: true }
-            )
+        this.signature = bin2hex(doSign(sk, this.getSignaturePlain()))
     }
 }

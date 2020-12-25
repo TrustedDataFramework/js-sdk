@@ -2,7 +2,42 @@ import { Transaction } from "./tx"
 import { CallContext } from "./vm"
 import BN = require('../bn')
 
+let hash: HashAlgorithm = 'sm3'
+let ec: EC = 'sm2'
+
+/**
+ * 哈希
+ */
+export function getHashAlgorithm(): HashAlgorithm {
+    return hash
+}
+
+/**
+ * 非对称加密
+ */
+export function getEC(): EC {
+    return ec
+}
+
+/**
+ * 哈希
+ */
+export function setHashAlgorithm(h: HashAlgorithm) {
+    hash = h
+}
+
+/**
+ * 非对称加密
+ */
+export function setEC(e: EC) {
+    ec = e
+}
+
 export type bigi = bigint | BN
+
+export type HashAlgorithm = 'sm3' | 'keccak-256' | 'sha3-256'
+
+export type EC = 'sm2' | 'ed25519'
 
 /**
  * 整数或者十进制、十六进制表示的整数字符串

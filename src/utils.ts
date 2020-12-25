@@ -1,11 +1,24 @@
-import { AbiInput, Binary, Digital, bigi } from "./constants"
+import { AbiInput, Binary, Digital, bigi, getEC, getHashAlgorithm } from "./constants"
 import { ABI_DATA_TYPE, MAX_I64, MIN_I64, MAX_U64, MAX_U256, MAX_SAFE_INTEGER, MIN_SAFE_INTEGER, ONE, ZERO } from './constants'
 import { sm2, sm3, sm4 } from '@salaku/sm-crypto'
 import { Transaction } from "./tx"
 import { Server } from 'http'
 import BN = require("../bn")
+import { keccak256, sha3_256 } from '../sha3'
+import nacl = require('../nacl')
 
 const UTF8Decoder = new TextDecoder('utf-8')
+
+export function digest(b: Binary): Uint8Array {
+    const h = getHashAlgorithm()
+    if (h === 'sm3')
+        return hex2bin(sm3(b))
+    let msg = hex2bin(b)
+    const hasher = (h === 'keccak-256' ? keccak256 : sha3_256).create()
+    hasher.update(msg)
+    return new Uint8Array(hasher.arrayBuffer())
+
+}
 
 /**
  * 将有符号整数转成 64 bit 位码，负数会被当作补码处理
@@ -57,10 +70,17 @@ export function padPrefix(arr: Uint8Array, prefix: number, size: number) {
  * @param sk 私钥
  */
 export function privateKey2PublicKey(sk: Binary): string {
-    let s = bin2hex(sk)
-    if (s.length / 2 != 32)
-        throw new Error('invalid private key, length = ' + s.length / 2)
-    return sm2.compress(sm2.getPKFromSK(s))
+    const ec = getEC()
+    if (ec === 'sm2') {
+        let s = bin2hex(sk)
+        if (s.length / 2 != 32)
+            throw new Error('invalid private key, length = ' + s.length / 2)
+        return sm2.compress(sm2.getPKFromSK(s))
+    }
+    if (ec === 'ed25519') {
+        const pair = nacl.sign.keyPair.fromSeed(hex2bin(sk))
+        return bin2hex(pair.publicKey)
+    }
 }
 
 /**
@@ -69,10 +89,16 @@ export function privateKey2PublicKey(sk: Binary): string {
  */
 export function publicKey2Address(pk: Binary): string {
     let k = hex2bin(pk)
-    if (k.length != 33)
-        throw new Error('invalid public key size: ' + k.length)
-
-    const buf = hex2bin(sm3(k))
+    const ec = getEC()
+    if (ec === 'sm2') {
+        if (k.length !== 33)
+            throw new Error('invalid public key size: ' + k.length)
+    }
+    if (ec === 'ed25519') {
+        if (k.length !== 32)
+            throw new Error('invalid public key size: ' + k.length)
+    }
+    const buf = digest(k)
     return bin2hex(buf.slice(buf.length - 20, buf.length))
 }
 
@@ -116,10 +142,10 @@ export function f64ToLong(f: number): bigi {
  */
 export function Long2F64(f: bigi): number {
     let buf = new ArrayBuffer(8)
-    if(typeof f === 'bigint'){
+    if (typeof f === 'bigint') {
         let v = new DataView(buf)
         v.setBigUint64(0, f, false)
-    }else{
+    } else {
         let v = new Uint8Array(buf)
         let encoded = encodeBE(f)
         v.set(encoded)
@@ -196,11 +222,8 @@ export function dig2str(s: Digital): string {
 
 export function normalizeAddress(addr: Binary): string {
     let b = hex2bin(addr)
-    // private key
-    if (b.length === 32)
-        return publicKey2Address(privateKey2PublicKey(addr))
     // public key
-    if (b.length === 33)
+    if (b.length === 33 || b.length === 32)
         return publicKey2Address(addr)
     if (b.length === 20)
         return bin2hex(b)
@@ -487,7 +510,7 @@ export function toBigN(x: string | number | bigi | ArrayBuffer | Uint8Array): bi
  * 转成 js 安全范围内的整数，避免丢失精度
  * @param x 十六进制的整数或者字符串 或者大端编码的字节数组
  */
-export function toSafeInt(x: string | number | bigi | ArrayBuffer | Uint8Array): bigint | number | string{
+export function toSafeInt(x: string | number | bigi | ArrayBuffer | Uint8Array): bigint | number | string {
     let i = toBigN(x)
     if (cmp(i, MIN_SAFE_INTEGER) < 0 || cmp(i, MAX_SAFE_INTEGER) > 0) {
         return typeof i === 'bigint' ? i : i.toString(10)
@@ -517,6 +540,19 @@ export function uuidv4() {
     });
 }
 
+export function doSign(sk: Binary, data: Binary): Uint8Array{
+    const ec = getEC()
+    if(ec === 'sm2'){
+        return hex2bin(sm2.doSignature(
+            data,
+            bin2hex(sk),
+            { userId: 'userid@soie-chain.com', der: false, hash: true }
+        ))
+    }
+    const pk = privateKey2PublicKey(sk)
+    return nacl.sign(hex2bin(data), hex2bin(bin2hex(sk) + pk))
+}
+
 /**
  * 用私钥对事务进行签名
  * @param tx  事务
@@ -529,10 +565,13 @@ export function sign(tx: Record<string, AbiInput>, sk: Binary): Transaction {
 }
 
 /**
- * 生成私钥
+ * 生成私钥 32 字节
  */
 export function generatePrivateKey(): string {
-    return (sm2.generateKeyPairHex()).privateKey
+    const ec = getEC()
+    if(ec === 'sm2')
+        return (sm2.generateKeyPairHex()).privateKey
+    return bin2hex(randomBytes(32))
 }
 
 export interface KeyStore {
@@ -688,14 +727,14 @@ export function createAuthServer(privateKey: Binary, whiteList: Binary[]): Serve
     return server
 }
 
-export function neg(x: bigi): bigi{
-    if(typeof x === 'bigint')
+export function neg(x: bigi): bigi {
+    if (typeof x === 'bigint')
         return -x
     return x.neg()
 }
 
-export function mul(x: bigi, y: bigi): bigi{
-    if(typeof x === 'bigint' && typeof y === 'bigint')
+export function mul(x: bigi, y: bigi): bigi {
+    if (typeof x === 'bigint' && typeof y === 'bigint')
         return x * y
-    return (<BN>x).mul(<BN> y)
+    return (<BN>x).mul(<BN>y)
 }
