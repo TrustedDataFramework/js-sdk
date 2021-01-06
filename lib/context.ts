@@ -302,7 +302,7 @@ export class Context {
         return _address(ContextType.CONTRACT_ADDRESS)
     }
 
-    static emit<T>(name: string, encoded: ArrayBuffer): void {
+    static emit(name: string, encoded: ArrayBuffer): void {
         _event(changetype<usize>(name), changetype<usize>(encoded))
     }
 
