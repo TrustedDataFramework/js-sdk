@@ -550,7 +550,7 @@ export function doSign(sk: Binary, data: Binary): Uint8Array{
         ))
     }
     const pk = privateKey2PublicKey(sk)
-    return nacl.sign(hex2bin(data), hex2bin(bin2hex(sk) + pk))
+    return nacl.sign(hex2bin(data), hex2bin(bin2hex(sk) + pk)).slice(0, 64)
 }
 
 /**
