@@ -22,6 +22,7 @@ module.exports = (env = {}) => ({
       url: false,
       path: false,
       fs: false,
+      https: false,
       worker_threads: false
     },
   },
