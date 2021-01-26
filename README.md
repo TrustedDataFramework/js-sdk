@@ -16,6 +16,14 @@ const tdsSDK = require('@salaku/js-sdk')
 console.log(tdsSDK.constants)
 ```
 
+### 选择加密算法(全局)
+
+```js
+const tdsSDK = require('@salaku/js-sdk')
+tdsSDK.setHash('sm3') // keccak-256 sha3-256
+tdsSDK.setEC('sm2') // ed25519
+```
+
 ### 事务签名
 
 ```js
@@ -114,6 +122,7 @@ const sk = 'f00df601a78147ffe0b84de1dffbebed2a6ea965becd5d0bd7faf54f1f29c6b5' //
 const builder = new tdsSDK.TransactionBuilder(tdsSDK.constants.POA_VERSION, sk, /* gas limit */ 0, /* gas price */ 0)
 ```
 
+sk 私钥选填，如果不填私钥，事务的 from 为空，而且事务不会被签名
 如果 builder 的 nonce 为0，则构造好的事务不会被签名，如果 builder 的 nonce 不为0，则构造出的事务都是已经签名过的事务，且每构造一个事务 builder 的 nonce 会自增 1
 
 ### 构造转账事务
@@ -157,7 +166,8 @@ const tx = builder.buildCancelVote('***transaction hash***')
 ## RPC 工具类
 
 ```js
-const rpc = new tdsSDK.RPC('localhost', 7010)
+const rpc = new tdsSDK.RPC('localhost', 7010) // 连接 http, ws
+const secureRPC = new tdsSDK.RPC('localhost', 443, true) // 连接 https, wss
 ```
 
 ### 查看账户
