@@ -207,6 +207,7 @@ export class RPC {
   private uuid: string
 
   private ssl: boolean
+  
   /**
    *
    * @param {string} host  主机名
@@ -214,7 +215,7 @@ export class RPC {
    */
   constructor(
     host: string = 'localhost',
-    port: string | number = 80,
+    port: string | number,
     ssl: boolean = false
   ) {
     this.host = host
@@ -228,6 +229,9 @@ export class RPC {
     this.rpcCallbacks = new Map() // nonce -> cb
     this.nonce = 0
     this.ssl = ssl
+    if(typeof port === 'string' && port)
+        port = parseInt(port)
+    this.port = <number> (port || (ssl ? 443 : 80))
   }
 
   /**
@@ -261,12 +265,12 @@ export class RPC {
 
     if (typeof WebSocket === 'function') {
       this.ws = new WebSocket(
-        `${protocol}${this.host}:${this.port || 80}/websocket/${this.uuid}`
+        `${protocol}${this.host}:${this.port}/websocket/${this.uuid}`
       )
     } else {
       let WS = require('ws')
       this.ws = new WS(
-        `${protocol}${this.host}:${this.port || 80}/websocket/${this.uuid}`,
+        `${protocol}${this.host}:${this.port}/websocket/${this.uuid}`,
         { rejectUnauthorized: false }
       )
     }
