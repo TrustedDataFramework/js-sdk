@@ -207,7 +207,7 @@ export class RPC {
   private uuid: string
 
   private ssl: boolean
-  
+
   /**
    *
    * @param {string} host  主机名
@@ -229,9 +229,8 @@ export class RPC {
     this.rpcCallbacks = new Map() // nonce -> cb
     this.nonce = 0
     this.ssl = ssl
-    if(typeof port === 'string' && port)
-        port = parseInt(port)
-    this.port = <number> (port || (ssl ? 443 : 80))
+    if (typeof port === 'string' && port) port = parseInt(port)
+    this.port = <number>(port || (ssl ? 443 : 80))
   }
 
   /**
