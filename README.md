@@ -4,7 +4,7 @@
 ## 安装
 
 ```bash
-npm install --save @salaku/js-sdk
+npm install --save @tdos/js-sdk
 ```
 
 ## 基本使用
@@ -12,14 +12,14 @@ npm install --save @salaku/js-sdk
 ### 常量
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 console.log(tdsSDK.constants)
 ```
 
 ### 选择加密算法(全局)
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 tdsSDK.setHash('sm3') // keccak-256 sha3-256
 tdsSDK.setEC('sm2') // ed25519
 ```
@@ -27,7 +27,7 @@ tdsSDK.setEC('sm2') // ed25519
 ### 事务签名
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const tx = {
     "version" : 1634693120,
     "type" : 0,
@@ -48,7 +48,7 @@ console.log(tx.signature)
 ### 计算事务哈希值
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const tx = tdsSDK.Transaction.clone({
     "version" : 1634693120,
     "type" : 0,
@@ -67,7 +67,7 @@ console.log(tx.getHash())
 ### 公钥转地址
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const pk = '02a4d7ca616e70897b7874460da1aab58b56e54c200a08e52a04c69df26b138859' // 公钥
 console.log(tdsSDK.publicKey2Address(pk))
 ```
@@ -75,7 +75,7 @@ console.log(tdsSDK.publicKey2Address(pk))
 ### 生成随机的私钥
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const sk = tdsSDK.generatePrivateKey() // 私钥
 console.log(sk)
 ```
@@ -83,7 +83,7 @@ console.log(sk)
 ### 私钥转公钥
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const sk = 'f00df601a78147ffe0b84de1dffbebed2a6ea965becd5d0bd7faf54f1f29c6b5' // 私钥
 console.log(tdsSDK.privateKey2PublicKey(sk))
 ```
@@ -91,7 +91,7 @@ console.log(tdsSDK.privateKey2PublicKey(sk))
 ### 计算合约地址
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const pk = '02a4d7ca616e70897b7874460da1aab58b56e54c200a08e52a04c69df26b138859' // 公钥
 const addr = tdsSDK.publicKey2Address(pk) // 合约构造者的地址
 const nonce = '100' // nonce
@@ -101,7 +101,7 @@ console.log(tdsSDK.getContractAddress(addr, nonce))
 ### 编译 assembly script 合约（异步），需要 node 环境
 
 ```js
-const tdsSDK = require('@salaku/js-sdk')
+const tdsSDK = require('@tdos/js-sdk')
 const src = 'index.ts'
 tdsSDK.compileContract(src)
     .then(buf => console.log('buf length ' + buf.length))
@@ -301,10 +301,10 @@ const tx = builder.buildCancelVote('c2458cad4c838b81b49500d9268b352b03cd1b78423c
  * erc 20 example in assembly script
  */
 
-export { __change_t, __malloc, __peek } from './node_modules/@salaku/js-sdk/lib' // 区块链应用程序接口
-import { Util, U256, Globals, ABI_DATA_TYPE } from './node_modules/@salaku/js-sdk/lib'
-import { Store } from './node_modules/@salaku/js-sdk/lib'
-import { Context, Address } from './node_modules/@salaku/js-sdk/lib'
+export { __change_t, __malloc, __peek } from './node_modules/@tdos/js-sdk/lib' // 区块链应用程序接口
+import { Util, U256, Globals, ABI_DATA_TYPE } from './node_modules/@tdos/js-sdk/lib'
+import { Store } from './node_modules/@tdos/js-sdk/lib'
+import { Context, Address } from './node_modules/@tdos/js-sdk/lib'
 
 const _balance = Store.from<Address, U256>('balance');
 const _freeze = Store.from<Address, U256>('freeze');
