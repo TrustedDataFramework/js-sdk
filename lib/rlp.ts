@@ -111,7 +111,15 @@ export class RLP {
     }
 
     static encodeU256(u: U256): ArrayBuffer {
-        return encodeBytes(u.buf);
+        let firstNoZero = 0;
+        let arr = Uint8Array.wrap(u.buf)
+    
+        for(; firstNoZero <= u.buf.byteLength; firstNoZero++) {
+            if (firstNoZero == u.buf.byteLength || arr[firstNoZero] != 0){
+                break
+            }
+        }
+        return encodeBytes(u.buf.slice(firstNoZero, u.buf.byteLength));
     }
 
     static decodeU64(u: ArrayBuffer): u64 {
