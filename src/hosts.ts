@@ -404,43 +404,43 @@ enum U256OP {
 }
 
 export class U256 extends AbstractHost {
-  ctx: CallContext 
+  static MAX_U256: bigint = BigInt(
+    '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'
+  )
+  ctx: CallContext
 
   constructor(world: VirtualMachine, ctx: CallContext) {
     super(world)
     this.ctx = ctx
   }
-  
-  execute(args: bigint[]): void {
+
+  execute(args: bigint[]): bigint {
     const op: U256OP = Number(args[0])
     let res = BigInt(0)
-    let l = <bigint> this.wai.peek(args[1], ABI_DATA_TYPE.u256)
-    let r = <bigint> this.wai.peek(args[2], ABI_DATA_TYPE.u256)
+    let l: bigint = <bigint>this.wai.peek(args[1], ABI_DATA_TYPE.u256)
+    let r: bigint = <bigint>this.wai.peek(args[2], ABI_DATA_TYPE.u256)
     switch (op) {
       case U256OP.SUM:
-        res = l + r
+        res = (l + r) & U256.MAX_U256
         break
       case U256OP.SUB:
-        res = l - r  
+        res = (l - r) & U256.MAX_U256
         break
       case U256OP.MUL:
-        res = l * r
+        res = (l * r) & U256.MAX_U256
         break
       case U256OP.DIV:
-        res = l / r  
+        res = l / r
         break
       case U256OP.MOD:
-        res = l % r     
-        break   
+        res = l % r
+        break
     }
     let p = this.wai.malloc(res, ABI_DATA_TYPE.u256)
-    let amount = <bigint>this.wai.peek(args[2], ABI_DATA_TYPE.u256)
-    let to = <ArrayBuffer>this.wai.peek(args[1], ABI_DATA_TYPE.address)
-    this.world.subBalance(this.ctx.contractAddress, amount)
-    this.world.addBalance(to, amount)
+    return BigInt(p)
   }
 
   name(): string {
-    return '_transfer'
-  }  
+    return '_u256'
+  }
 }

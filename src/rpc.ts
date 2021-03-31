@@ -498,8 +498,8 @@ export class RPC {
       method,
       params
     ]).then((r) => {
-      let body = (r.body instanceof Uint8Array) ? [r.body] : r.body
-      return <Readable>contract.abiDecode(method, <Uint8Array[]> body)
+      let body = r.body instanceof Uint8Array ? [r.body] : r.body
+      return <Readable>contract.abiDecode(method, <Uint8Array[]>body)
     })
   }
 
