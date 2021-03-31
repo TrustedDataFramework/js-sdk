@@ -1,5 +1,26 @@
 import { Util } from "./util"
 
+// @ts-ignore
+@external("env", "_u256")
+// type, address?
+declare function _u256(op: u64, left: u64, right: u64): u64;
+
+function _u256_op(op: U256OP, left: U256, right: U256): U256 {
+    let l = changetype<usize>(left)
+    let r = changetype<usize>(right)
+    return changetype<U256>(usize(_u256(u64(op), u64(l), u64(r))))
+}
+
+
+enum U256OP {
+    SUM,
+    SUB,
+    MUL,
+    DIV,
+    MOD
+}
+
+
 const chars = '0123456789'
 
 export class U256 {
@@ -23,13 +44,13 @@ export class U256 {
     // 除法不会溢出，除数不能为 0
     @operator("/")
     static __op_div(left: U256, right: U256): U256 {
-        return left.divMod(right)[0]
+        return left.div(right)
     }
 
     // 求模不会溢出，除数不能为 0
     @operator("%")
     static __op_mod(left: U256, right: U256): U256 {
-        return left.divMod(right)[1]
+        return left.mod(right)
     }
 
     @operator(">")
@@ -86,25 +107,11 @@ export class U256 {
     }
 
     add(u: U256): U256 {
-        const l = Uint8Array.wrap(this.buf)
-        const r = Uint8Array.wrap(u.buf)
-        const newData = new Uint8Array(32)
-        for (let i = 31, overflow: u32 = 0; i >= 0; i--) {
-            let v = u32(l[i]) + u32(r[i]) + overflow
-            newData[i] = u8(v & 0xff)
-            overflow = v >>> 8
-        }
-        return new U256(newData.buffer)
+        return _u256_op(U256OP.SUM, this, u)
     }
 
     sub(u: U256): U256 {
-        const r = Uint8Array.wrap(u.buf)
-        const neg = new Uint8Array(32)
-        for (let i = 0; i < neg.length; i++) {
-            neg[i] = ~r[i]
-        }
-        const n = new U256(neg.buffer)
-        return this.add(n.add(U256.one()))
+        return _u256_op(U256OP.SUB, this, u)
     }
 
     // 左移 n 个 单位
@@ -185,17 +192,7 @@ export class U256 {
     }
 
     mul(r: U256): U256 {
-        let ret = U256.ZERO
-        let l = new U256(this.buf)
-        while (!r.isZero()) {
-            let n = r.lastBit()
-            if (n) {
-                ret = ret.add(l)
-            }
-            l = l.lshift()
-            r = r.rshift()
-        }
-        return ret
+        return _u256_op(U256OP.MUL, this, r)
     }
 
     safeMul(u: U256): U256 {
@@ -221,6 +218,8 @@ export class U256 {
     }
 
     isZero(): bool {
+        if(this == U256.ZERO)
+            return true
         const u = Uint8Array.wrap(this.buf)
         for (let i = 0; i < u.length; i++) {
             if (u[i] != 0)
@@ -236,9 +235,9 @@ export class U256 {
         if (n == U256.ZERO)
             return '0'
         while (n > U256.ZERO) {
-            const dm = n.divMod(BASE)
-            n = dm[0]
-            let m = dm[1]
+            const div = n.div(BASE)
+            const m = n.mod(BASE)
+            n = div
             ret = chars.charAt(i32(m.u64())) + ret
         }
         return ret
@@ -249,26 +248,12 @@ export class U256 {
         return Util.bytesToU64(arr)
     }
 
-    div(divisor: U256): U256 {
-        return this.divMod(divisor)[0]
+    div(divisor: U256): U256 {       
+        return _u256_op(U256OP.DIV, this, divisor)
     }
 
-
-    divMod(divisor: U256): U256[] {
-        if (divisor == U256.ZERO)
-            // 除法溢出
-            unreachable()
-        let dividend = new U256(this.buf)
-        let quo = U256.ZERO
-        for (let i = 255; i >= 0; i--) {
-            //比较dividend是否大于divisor的(1<<i)次方，不要将dividend与(divisor<<i)比较，而是用(dividend>>i)与divisor比较，
-            //效果一样，但是可以避免因(divisor<<i)操作可能导致的溢出，如果溢出则会可能dividend本身小于divisor，但是溢出导致dividend大于divisor       
-            if (dividend.rshiftN(i) >= divisor) {
-                quo = quo.add(U256.oneLshift(i))
-                dividend = dividend.safeSub(divisor.lshiftN(i))
-            }
-        }
-        return [quo, dividend]
+    mod(divisor: U256): U256 {
+        return _u256_op(U256OP.MOD, this, divisor)
     }
 
     public static oneLshift(i: i32): U256 {

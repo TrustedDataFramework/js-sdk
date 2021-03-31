@@ -25,7 +25,8 @@ import {
   Log,
   Reflect,
   Transfer,
-  AbstractHost
+  AbstractHost,
+  U256
 } from './hosts'
 
 import * as rlp from './rlp'
@@ -570,7 +571,8 @@ export class VirtualMachine {
       new DBHost(this, ctx),
       new ContextHost(this, ctx),
       new Reflect(this, ctx),
-      new Transfer(this, ctx)
+      new Transfer(this, ctx),
+      new U256(this, ctx)
     ]
 
     hosts.forEach((h) => {
