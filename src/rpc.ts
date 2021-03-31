@@ -497,7 +497,10 @@ export class RPC {
       hex2bin(addr),
       method,
       params
-    ]).then((r) => <Readable>contract.abiDecode(method, <Uint8Array[]>r.body))
+    ]).then((r) => {
+      let body = (r.body instanceof Uint8Array) ? [r.body] : r.body
+      return <Readable>contract.abiDecode(method, <Uint8Array[]> body)
+    })
   }
 
   /**
