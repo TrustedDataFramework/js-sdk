@@ -491,6 +491,10 @@ export function cmp(x: bigi, y: bigi): number {
     if (x === y) return 0
     return 1
   }
+
+  // convert both to BN
+  x = typeof x === 'bigint' ? new BN(x.toString(16), 16) : x
+  y = typeof y === 'bigint' ? new BN(y.toString(16), 16) : y
   return (<BN>x).cmp(<BN>y)
 }
 
