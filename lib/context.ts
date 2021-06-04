@@ -191,7 +191,6 @@ enum ContextType {
     TX_GAS_PRICE,
     TX_AMOUNT,
     TX_TO,
-    TX_SIGNATURE,
     TX_HASH,
     CONTRACT_ADDRESS,
     CONTRACT_NONCE,
@@ -227,11 +226,12 @@ export enum TransactionType {
 export class ParametersBuilder {
     private readonly types: Array<ArrayBuffer>;
     private readonly elements: Array<ArrayBuffer>;
+    private readonly returns: Array<ArrayBuffer>;
 
     constructor() {
         this.elements = new Array<ArrayBuffer>();
         this.types = new Array<ArrayBuffer>();
-
+        this.returns = new Array<ArrayBuffer>();
     }
 
     push<T>(data: T): void {
@@ -239,18 +239,20 @@ export class ParametersBuilder {
         this.elements.push(RLP.encode<T>(data));
     }
 
-    build(): Parameters {
+    build<T>(): Parameters {
         const ar = RLP.encodeElements(this.elements);
-        return new Parameters(this.types, this.elements);
+        this.returns.push(RLP.encodeU64(__getAbiOf<T>()))
+        return new Parameters(this.types, this.elements, this.returns);
     }
 }
 
 export class Parameters {
-    static EMPTY: Parameters = new Parameters([], []);
+    static EMPTY: Parameters = new Parameters([], [], []);
 
     constructor(
         readonly types: Array<ArrayBuffer>,
-        readonly li: Array<ArrayBuffer>
+        readonly li: Array<ArrayBuffer>,
+        readonly returns: Array<ArrayBuffer>
     ) { }
 }
 
@@ -278,7 +280,6 @@ export class Transaction {
         readonly gasPrice: U256,
         readonly amount: U256,
         readonly to: Address,
-        readonly signature: ArrayBuffer,
         readonly hash: ArrayBuffer
     ) {
     }
@@ -331,7 +332,6 @@ export class Context {
             _u256(ContextType.TX_GAS_PRICE),
             _u256(ContextType.TX_AMOUNT),
             _address(ContextType.TX_TO),
-            _bytes(ContextType.TX_SIGNATURE),
             _bytes(ContextType.TX_HASH),
         );
     }
@@ -344,14 +344,14 @@ export class Context {
         )
     }
 
-    static create(code: ArrayBuffer, abi: ArrayBuffer, parameters: Parameters, amount: U256): Address {
-        const arr: Array<ArrayBuffer> = [RLP.encodeElements(parameters.types), RLP.encodeElements(parameters.li), RLP.emptyList()];
+    static create<T>(code: ArrayBuffer, abi: ArrayBuffer, parameters: Parameters, amount: U256): T {
+        const arr: Array<ArrayBuffer> = [RLP.encodeElements(parameters.types), RLP.encodeElements(parameters.li), RLP.encodeElements(parameters.returns)];
         const buf = RLP.encodeElements(arr);
         const r = _reflect(
             ReflectType.CREATE, changetype<usize>(code),
             changetype<usize>('init'), changetype<usize>(buf),
             changetype<usize>(amount), changetype<usize>(abi)
         )
-        return changetype<Address>(usize(r))
+        return changetype<T>(usize(r))
     }
 }

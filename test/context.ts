@@ -17,7 +17,6 @@ export function init(): void{
     assert(tx.gasPrice.u64() == 123456789, 'tx gas price is ' + tx.gasPrice.u64().toString())
     assert(tx.amount.u64() == 1234567890, 'tx amount')
     assert(tx.to.toString() == '9cbf30db111483e4b84e77ca0e39378fd7605e1b')
-    assert(Util.encodeHex(tx.signature) == '9cbf30db111483e4b84e77ca0e39378fd7605e1b')
     assert(Util.encodeHex(tx.hash) == '9cbf30db111483e4b84e77ca0e39378fd7605e1b')
     // log('tx hash = ' + Util.encodeHex(tx.hash))
 }

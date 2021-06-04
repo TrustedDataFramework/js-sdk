@@ -164,6 +164,8 @@ export class Transaction implements Encoder {
    * 合约调用的方法
    */
   getMethod() {
+    if(/^[0]{18}.+$/.test(this.to))
+      return ''
     const t = typeof this.type === 'string' ? parseInt(this.type) : this.type
     return t === constants.DEPLOY
       ? 'init'

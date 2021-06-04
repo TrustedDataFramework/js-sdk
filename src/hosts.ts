@@ -62,7 +62,6 @@ enum ContextType {
   TX_GAS_PRICE,
   TX_AMOUNT,
   TX_TO,
-  TX_SIGNATURE,
   TX_HASH,
   CONTRACT_ADDRESS,
   CONTRACT_NONCE,
@@ -217,9 +216,6 @@ export class ContextHost extends AbstractHost {
       }
       case ContextType.TX_TO: {
         return BigInt(this.wai.malloc(this.ctx.to, ABI_DATA_TYPE.address))
-      }
-      case ContextType.TX_SIGNATURE: {
-        return BigInt(this.wai.malloc(this.ctx.signature, ABI_DATA_TYPE.bytes))
       }
       case ContextType.TX_HASH: {
         return BigInt(this.wai.malloc(this.ctx.txHash, ABI_DATA_TYPE.bytes))

@@ -10,3 +10,4 @@ docs
 test
 local
 *.wasm
+test.ts
